@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Voice Claude</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- PWA install (manifest is optional for v1; add later) -->
+</head>
+<body>
+  <header>
+    <div class="brand">Voice&nbsp;Claude</div>
+    <div class="header-right">
+      <select id="provider-select" title="AI provider for the active session"></select>
+      <div id="status" class="status idle">idle</div>
+    </div>
+  </header>
+
+  <main>
+    <aside id="sidebar">
+      <div class="sidebar-head">Sessions</div>
+      <ul id="session-list"></ul>
+      <button id="new-session">+ New session</button>
+    </aside>
+
+    <section id="conversation">
+      <div id="messages"></div>
+    </section>
+  </main>
+
+  <footer>
+    <button id="mic-toggle" class="mic">Start listening</button>
+    <form id="text-form">
+      <input id="text-input" placeholder="or type a message…" autocomplete="off" />
+      <button type="submit">Send</button>
+    </form>
+  </footer>
+
+  <!-- Silero VAD in the browser via ONNX. This CDN bundle exposes window.vad -->
+  <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.19/dist/bundle.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

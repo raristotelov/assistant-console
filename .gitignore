@@ -1,0 +1,14 @@
+node_modules/
+.env
+.env.*
+*.local.json
+whisper.cpp/
+models/
+voices/
+*.bin
+*.onnx
+*.log
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

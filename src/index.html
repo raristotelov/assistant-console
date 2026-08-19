@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Assistant Console</title>
+  <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
+  <style>
+    :root { --bg:#0a0f1c; --panel:#111827; --border:#1f2937; --text:#e5e7eb; --accent:#0055ff; }
+    * { box-sizing: border-box; }
+    html, body { height:100%; margin:0; background:var(--bg); color:var(--text);
+      font:14px -apple-system, system-ui, sans-serif; display:flex; flex-direction:column; }
+    header { padding:10px 14px; border-bottom:1px solid var(--border); display:flex;
+      align-items:center; justify-content:space-between; }
+    .brand { font-weight:700; }
+    #terminal { flex:1; padding:8px; overflow:hidden; }
+    footer { display:flex; gap:8px; padding:10px 14px; border-top:1px solid var(--border); }
+    #mic { background:var(--accent); color:#fff; border:none; padding:10px 16px;
+      border-radius:999px; cursor:pointer; font-weight:600; }
+    #mic.active { background:#34d399; color:#04231a; }
+    #read, #stop-speak { background:var(--panel); border:1px solid var(--border);
+      color:var(--text); padding:10px 14px; border-radius:999px; cursor:pointer; }
+    #read.active { background:#34d399; color:#04231a; border-color:#34d399; }
+    #line { flex:1; background:var(--panel); border:1px solid var(--border); color:var(--text);
+      padding:10px 14px; border-radius:8px; outline:none; }
+    #send { background:var(--panel); border:1px solid var(--border); color:var(--text);
+      padding:10px 16px; border-radius:8px; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">Assistant&nbsp;Console</div>
+    <div id="status">terminal</div>
+  </header>
+
+  <div id="terminal"></div>
+
+  <footer>
+    <button id="mic">Start listening</button>
+    <button id="read">Reading: off</button>
+    <button id="stop-speak">Stop speaking</button>
+    <input id="line" placeholder="type a message and press Enter…" autocomplete="off" />
+    <button id="send">Send</button>
+  </footer>
+
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.19/dist/bundle.min.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

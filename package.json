@@ -1,15 +1,21 @@
 {
-  "name": "voice-claude",
-  "version": "0.1.0",
-  "description": "Talk to Claude Code sessions hands-free from a browser (laptop or phone).",
-  "type": "module",
+  "name": "assistant-console",
+  "version": "0.2.0",
+  "description": "Native console: a live claude terminal you can type in or talk to, with spoken replies.",
+  "main": "src/main.js",
   "scripts": {
-    "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "start": "electron .",
+    "test": "npm run test:js && npm run test:py",
+    "test:js": "node --test",
+    "test:py": "python3 test/tts_worker_test.py"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.1.0",
-    "express": "^4.19.2",
-    "ws": "^8.18.0"
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "dotenv": "^17.4.2",
+    "node-pty": "^1.0.0"
   }
 }

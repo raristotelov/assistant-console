@@ -53,6 +53,18 @@ async function createSession() {
   return { id, folder };
 }
 
+const INHERITED_EDITOR_KEYS = ["TERM_PROGRAM", "TERM_PROGRAM_VERSION", "CLAUDE_CODE_SSE_PORT"];
+
+function shellEnv(extra) {
+  const env = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (INHERITED_EDITOR_KEYS.includes(key)) continue;
+    if (key.startsWith("VSCODE_")) continue;
+    env[key] = value;
+  }
+  return { ...env, ...extra };
+}
+
 function openTerminal(id) {
   const session = sessions.get(id);
   if (!session || session.term) return;
@@ -67,7 +79,10 @@ function openTerminal(id) {
     cols: 100,
     rows: 30,
     cwd: session.folder,
-    env: { ...process.env, ASSISTANT_CONSOLE_SESSION_FILE: pointerFile },
+    env: shellEnv({
+      ASSISTANT_CONSOLE_SESSION_FILE: pointerFile,
+      ...(session.idePort ? { CLAUDE_CODE_SSE_PORT: String(session.idePort) } : {}),
+    }),
   });
 
   term.onData((data) => win?.webContents.send("term:data", { id, data }));
@@ -101,7 +116,20 @@ async function openEditor(id) {
     extensionsDir: path.join(rootDir, "extensions"),
     templateDir: path.join(rootDir, "user-data-template"),
   });
+
+  codeServer.findIdePort(session.folder).then((port) => {
+    if (!port || sessions.get(id) !== session) return;
+    session.idePort = port;
+    exportIdePort(session, port);
+  });
+
   return { url: session.editor.url };
+}
+
+function exportIdePort(session, port) {
+  const shellName = path.basename(process.env.SHELL || "zsh");
+  if (!session.term || session.term.process !== shellName) return;
+  session.term.write(`export CLAUDE_CODE_SSE_PORT=${port}\r`);
 }
 
 function closeSession(id) {

@@ -111,6 +111,37 @@ function seedUserData(userDataDir, templateDir) {
   }
 }
 
+const IDE_LOCK_DIR = path.join(os.homedir(), ".claude", "ide");
+const IDE_LOCK_TIMEOUT_MS = 120000;
+const IDE_LOCK_POLL_MS = 500;
+
+function readIdeLock(file) {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(IDE_LOCK_DIR, file), "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+async function findIdePort(folder) {
+  const deadline = Date.now() + IDE_LOCK_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    let files = [];
+    try {
+      files = fs.readdirSync(IDE_LOCK_DIR).filter((f) => f.endsWith(".lock"));
+    } catch {}
+
+    for (const file of files) {
+      const lock = readIdeLock(file);
+      if (lock?.ideName !== "code-server") continue;
+      if (!lock.workspaceFolders?.includes(folder)) continue;
+      return Number(path.basename(file, ".lock"));
+    }
+    await new Promise((r) => setTimeout(r, IDE_LOCK_POLL_MS));
+  }
+  return null;
+}
+
 function freePort() {
   return new Promise((resolve, reject) => {
     const probe = net.createServer();
@@ -177,4 +208,4 @@ async function start({ rootDir, folder, userDataDir, extensionsDir, templateDir 
   };
 }
 
-module.exports = { start, VERSION };
+module.exports = { start, findIdePort, VERSION };

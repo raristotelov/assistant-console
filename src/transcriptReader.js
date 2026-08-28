@@ -2,15 +2,31 @@ const fs = require("node:fs");
 
 const POLL_MS = 300;
 
+const emptyStats = () => ({
+  model: null,
+  cwd: null,
+  gitBranch: null,
+  contextTokens: 0,
+  messages: 0,
+  inputTokens: 0,
+  outputTokens: 0,
+  cacheReadTokens: 0,
+  cacheCreationTokens: 0,
+});
+
 class TranscriptReader {
-  constructor(pointerFile, onReply) {
+  constructor(pointerFile, { onReply, onStats } = {}) {
     this.pointerFile = pointerFile;
-    this.onReply = onReply;
+    this.onReply = onReply || (() => {});
+    this.onStats = onStats || (() => {});
     this.enabled = false;
     this.transcriptPath = null;
     this.offset = 0;
+    this.speakFrom = Infinity;
     this.carry = "";
     this.timer = null;
+    this.stats = emptyStats();
+    this.statsChanged = false;
   }
 
   start() {
@@ -24,7 +40,8 @@ class TranscriptReader {
   }
 
   enable() {
-    this.fastForwardToLiveEnd();
+    this.refreshTranscriptPath();
+    this.speakFrom = this.fileSize();
     this.enabled = true;
   }
 
@@ -32,13 +49,12 @@ class TranscriptReader {
     this.enabled = false;
   }
 
-  fastForwardToLiveEnd() {
-    this.refreshTranscriptPath();
-    if (!this.transcriptPath) return;
+  fileSize() {
     try {
-      this.offset = fs.statSync(this.transcriptPath).size;
-      this.carry = "";
-    } catch {}
+      return fs.statSync(this.transcriptPath).size;
+    } catch {
+      return 0;
+    }
   }
 
   refreshTranscriptPath() {
@@ -50,12 +66,11 @@ class TranscriptReader {
     }
     if (!pointed || pointed === this.transcriptPath) return;
     this.transcriptPath = pointed;
+    this.offset = 0;
     this.carry = "";
-    try {
-      this.offset = fs.statSync(pointed).size;
-    } catch {
-      this.offset = 0;
-    }
+    this.stats = emptyStats();
+    this.statsChanged = true;
+    this.speakFrom = this.enabled ? this.fileSize() : Infinity;
   }
 
   poll() {
@@ -68,30 +83,41 @@ class TranscriptReader {
     } catch {
       return;
     }
-    if (size <= this.offset) return;
-
-    let appended;
-    try {
-      const fd = fs.openSync(this.transcriptPath, "r");
+    if (size > this.offset) {
+      let appended;
       try {
-        const buf = Buffer.alloc(size - this.offset);
-        fs.readSync(fd, buf, 0, buf.length, this.offset);
-        appended = buf.toString("utf8");
-      } finally {
-        fs.closeSync(fd);
+        const fd = fs.openSync(this.transcriptPath, "r");
+        try {
+          const buf = Buffer.alloc(size - this.offset);
+          fs.readSync(fd, buf, 0, buf.length, this.offset);
+          appended = buf.toString("utf8");
+        } finally {
+          fs.closeSync(fd);
+        }
+      } catch {
+        return;
       }
-    } catch {
-      return;
-    }
-    this.offset = size;
 
-    const lines = (this.carry + appended).split("\n");
-    this.carry = lines.pop();
-    for (const line of lines) this.handleLine(line);
+      const carried = this.carry;
+      let cursor = this.offset - Buffer.byteLength(carried);
+      this.offset = size;
+
+      const lines = (carried + appended).split("\n");
+      this.carry = lines.pop();
+      for (const line of lines) {
+        const lineEnd = cursor + Buffer.byteLength(line);
+        this.handleLine(line, lineEnd);
+        cursor = lineEnd + 1;
+      }
+    }
+
+    if (this.statsChanged) {
+      this.statsChanged = false;
+      this.onStats({ ...this.stats });
+    }
   }
 
-  handleLine(line) {
-    if (!this.enabled) return;
+  handleLine(line, lineEnd) {
     const trimmed = line.trim();
     if (!trimmed) return;
 
@@ -101,9 +127,14 @@ class TranscriptReader {
     } catch {
       return;
     }
-    if (entry.type !== "assistant" || entry.isSidechain) return;
+    if (entry.type !== "assistant") return;
 
-    const content = entry.message?.content;
+    const message = entry.message || {};
+    this.applyUsage(entry, message);
+    if (entry.isSidechain) return;
+    if (!this.enabled || lineEnd <= this.speakFrom) return;
+
+    const content = message.content;
     if (!Array.isArray(content)) return;
 
     const text = content
@@ -112,6 +143,30 @@ class TranscriptReader {
       .join(" ")
       .trim();
     if (text) this.onReply(text);
+  }
+
+  applyUsage(entry, message) {
+    const usage = message.usage;
+    if (!usage) return;
+
+    const input = usage.input_tokens || 0;
+    const output = usage.output_tokens || 0;
+    const cacheRead = usage.cache_read_input_tokens || 0;
+    const cacheCreation = usage.cache_creation_input_tokens || 0;
+
+    this.stats.inputTokens += input;
+    this.stats.outputTokens += output;
+    this.stats.cacheReadTokens += cacheRead;
+    this.stats.cacheCreationTokens += cacheCreation;
+
+    if (!entry.isSidechain) {
+      this.stats.messages += 1;
+      this.stats.contextTokens = input + cacheRead + cacheCreation + output;
+      this.stats.model = message.model || this.stats.model;
+      this.stats.cwd = entry.cwd || this.stats.cwd;
+      this.stats.gitBranch = entry.gitBranch || this.stats.gitBranch;
+    }
+    this.statsChanged = true;
   }
 }
 

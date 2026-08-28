@@ -8,13 +8,33 @@ const { TranscriptReader } = require("../src/transcriptReader");
 const entry = (obj) => JSON.stringify(obj) + "\n";
 const assistant = (text) => entry({ type: "assistant", message: { content: [{ type: "text", text }] } });
 
+const usageEntry = (usage, extra = {}) =>
+  entry({
+    type: "assistant",
+    cwd: "/Users/me/projects/demo",
+    gitBranch: "main",
+    ...extra,
+    message: { model: "claude-opus-5", content: [{ type: "text", text: "hi" }], usage },
+  });
+
+const usage = (input, output, cacheRead, cacheCreation) => ({
+  input_tokens: input,
+  output_tokens: output,
+  cache_read_input_tokens: cacheRead,
+  cache_creation_input_tokens: cacheCreation,
+});
+
 function setup() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ac-reader-test-"));
   const pointer = path.join(dir, "pointer");
   const transcript = path.join(dir, "session.jsonl");
   const spoken = [];
-  const reader = new TranscriptReader(pointer, (text) => spoken.push(text));
-  return { dir, pointer, transcript, spoken, reader };
+  const statsSeen = [];
+  const reader = new TranscriptReader(pointer, {
+    onReply: (text) => spoken.push(text),
+    onStats: (stats) => statsSeen.push(stats),
+  });
+  return { dir, pointer, transcript, spoken, statsSeen, reader };
 }
 
 test("speaks a new assistant message", () => {
@@ -128,4 +148,62 @@ test("ignores malformed json lines", () => {
   fs.appendFileSync(transcript, assistant("Still fine."));
   reader.poll();
   assert.deepEqual(spoken, ["Still fine."]);
+});
+
+test("accumulates token totals and reports context from the latest turn", () => {
+  const { pointer, transcript, statsSeen, reader } = setup();
+  fs.writeFileSync(transcript, "");
+  fs.writeFileSync(pointer, transcript);
+  fs.appendFileSync(transcript, usageEntry(usage(10, 100, 0, 5000)));
+  fs.appendFileSync(transcript, usageEntry(usage(2, 250, 5000, 300)));
+  reader.poll();
+
+  const stats = statsSeen.at(-1);
+  assert.equal(stats.inputTokens, 12);
+  assert.equal(stats.outputTokens, 350);
+  assert.equal(stats.cacheReadTokens, 5000);
+  assert.equal(stats.cacheCreationTokens, 5300);
+  assert.equal(stats.messages, 2);
+  assert.equal(stats.contextTokens, 2 + 5000 + 300 + 250);
+  assert.equal(stats.model, "claude-opus-5");
+  assert.equal(stats.cwd, "/Users/me/projects/demo");
+  assert.equal(stats.gitBranch, "main");
+});
+
+test("counts history usage even when reading was never enabled", () => {
+  const { pointer, transcript, statsSeen, spoken, reader } = setup();
+  fs.writeFileSync(transcript, usageEntry(usage(5, 50, 0, 100)));
+  fs.writeFileSync(pointer, transcript);
+  reader.poll();
+  assert.deepEqual(spoken, []);
+  assert.equal(statsSeen.at(-1).outputTokens, 50);
+});
+
+test("counts subagent tokens but keeps them out of context and message count", () => {
+  const { pointer, transcript, statsSeen, reader } = setup();
+  fs.writeFileSync(transcript, "");
+  fs.writeFileSync(pointer, transcript);
+  fs.appendFileSync(transcript, usageEntry(usage(1, 10, 20, 30)));
+  fs.appendFileSync(transcript, usageEntry(usage(7, 70, 700, 7000), { isSidechain: true }));
+  reader.poll();
+
+  const stats = statsSeen.at(-1);
+  assert.equal(stats.outputTokens, 80);
+  assert.equal(stats.messages, 1);
+  assert.equal(stats.contextTokens, 1 + 20 + 30 + 10);
+});
+
+test("resets stats when the session changes", () => {
+  const { dir, pointer, transcript, statsSeen, reader } = setup();
+  fs.writeFileSync(transcript, usageEntry(usage(10, 100, 0, 500)));
+  fs.writeFileSync(pointer, transcript);
+  reader.poll();
+  assert.equal(statsSeen.at(-1).outputTokens, 100);
+
+  const next = path.join(dir, "session-two.jsonl");
+  fs.writeFileSync(next, usageEntry(usage(1, 2, 3, 4)));
+  fs.writeFileSync(pointer, next);
+  reader.poll();
+  assert.equal(statsSeen.at(-1).outputTokens, 2);
+  assert.equal(statsSeen.at(-1).messages, 1);
 });

@@ -11,7 +11,8 @@ const fs = require("node:fs");
 const crypto = require("node:crypto");
 const pty = require("node-pty");
 const codeServer = require("./codeServer");
-const { transcribe, TtsEngine } = require("./speech");
+const { transcribe, TtsEngine, configure } = require("./speech");
+const { ensureWhisperModel, ensurePython } = require("./provision");
 const { TranscriptReader } = require("./transcriptReader");
 const { toSpeakable } = require("./speakable");
 
@@ -27,7 +28,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 1280,
     height: 800,
-    backgroundColor: "#0a0f1c",
+    backgroundColor: "#24292e",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -51,6 +52,30 @@ async function createSession() {
   const folder = picked.filePaths[0];
   sessions.set(id, { id, folder, term: null, reader: null, pointerFile: null, editor: null });
   return { id, folder };
+}
+
+let voiceReady = null;
+
+function ensureVoiceReady() {
+  if (voiceReady) return voiceReady;
+
+  const rootDir = app.getPath("userData");
+  const onStatus = (text) => win?.webContents.send("voice:status", text);
+
+  voiceReady = (async () => {
+    const model = await ensureWhisperModel(rootDir, onStatus);
+    const python = await ensurePython(rootDir, onStatus);
+    configure({ model, python });
+    onStatus("");
+    tts.start();
+  })();
+
+  voiceReady.catch((e) => {
+    voiceReady = null;
+    onStatus(`voice setup failed: ${e.message || e}`);
+  });
+
+  return voiceReady;
 }
 
 const INHERITED_EDITOR_KEYS = ["TERM_PROGRAM", "TERM_PROGRAM_VERSION", "CLAUDE_CODE_SSE_PORT"];
@@ -158,7 +183,6 @@ app.whenReady().then(() => {
     },
     onError: (msg) => console.error(`[tts] ${msg}`),
   });
-  tts.start();
 
   ipcMain.handle("session:create", () => createSession());
   ipcMain.on("session:close", (_e, id) => closeSession(id));
@@ -179,7 +203,12 @@ app.whenReady().then(() => {
   ipcMain.on("voice:reading", (_e, { id, on }) => {
     const session = sessions.get(id);
     if (!session?.reader) return;
-    if (on) session.reader.enable(); else session.reader.disable();
+    if (on) {
+      ensureVoiceReady().catch(() => {});
+      session.reader.enable();
+    } else {
+      session.reader.disable();
+    }
   });
 
   ipcMain.on("voice:cancel", () => {
@@ -189,6 +218,7 @@ app.whenReady().then(() => {
 
   // STT: renderer sends a captured utterance (WAV), we return the transcript.
   ipcMain.handle("voice:transcribe", async (_e, arrayBuffer) => {
+    await ensureVoiceReady();
     const buf = Buffer.from(arrayBuffer);
     return await transcribe(buf);
   });

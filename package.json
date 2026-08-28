@@ -7,10 +7,44 @@
     "start": "electron .",
     "test": "npm run test:js && npm run test:py",
     "test:js": "node --test",
-    "test:py": "python3 test/tts_worker_test.py"
+    "test:py": "python3 test/tts_worker_test.py",
+    "predist": "bash scripts/build-whisper.sh",
+    "dist": "electron-builder",
+    "postdist": "bash scripts/install-app.sh",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "build": {
+    "appId": "com.radostinaristotelov.assistant-console",
+    "productName": "Assistant Console",
+    "files": [
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "src/tts_worker.py"
+    ],
+    "extraResources": [
+      {
+        "from": "tools/whisper",
+        "to": "whisper"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": [
+        "dmg"
+      ],
+      "identity": "-",
+      "hardenedRuntime": false,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Assistant Console uses the microphone so you can speak to Claude Code."
+      }
+    }
   },
   "devDependencies": {
-    "electron": "^32.0.0"
+    "electron": "^32.0.0",
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",

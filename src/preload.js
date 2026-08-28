@@ -27,5 +27,6 @@ contextBridge.exposeInMainWorld("api", {
     onAudioChunk: (cb) => ipcRenderer.on("voice:audio-chunk", (_e, chunk) => cb(chunk)),
     cancelSpeech: () => ipcRenderer.send("voice:cancel"),
     onCancelled: (cb) => ipcRenderer.on("voice:cancelled", (_e, id) => cb(id)),
+    onStatus: (cb) => ipcRenderer.on("voice:status", (_e, text) => cb(text)),
   },
 });

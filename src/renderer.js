@@ -114,7 +114,7 @@ async function addTerminal(session) {
   const term = new Terminal({
     fontFamily: "Menlo, Monaco, monospace",
     fontSize: 13,
-    theme: { background: "#0a0f1c", foreground: "#e5e7eb" },
+    theme: { background: "#24292e", foreground: "#d1d5da" },
     cursorBlink: true,
   });
   const fit = new FitAddon.FitAddon();
@@ -326,6 +326,8 @@ function stopSpeaking() {
   if (currentSource) { try { currentSource.stop(); } catch {} currentSource = null; }
 }
 
+window.api.voice.onStatus((text) => setStatus(text || (listening ? "listening" : "terminal")));
+
 window.api.voice.onCancelled((id) => {
   if (id > lastCancelledReplyId) lastCancelledReplyId = id;
   playQueue = playQueue.filter((c) => c.id > lastCancelledReplyId);
@@ -361,6 +363,7 @@ async function startListening() {
       baseAssetPath: "https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.19/dist/",
       onnxWASMBasePath: "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/",
       onSpeechStart: () => {
+        showHeard("");
         setStatus("listening");
       },
       onSpeechEnd: async (audio) => {

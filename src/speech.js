@@ -3,14 +3,23 @@
 // Paths come from env vars (set in a .env or the shell that launches the app).
 
 const { spawn } = require("node:child_process");
+const { existsSync } = require("node:fs");
 const { writeFile, readFile, mkdtemp, rm } = require("node:fs/promises");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 
-const WHISPER_BIN = process.env.WHISPER_BIN || "whisper-cli";
-const WHISPER_MODEL = process.env.WHISPER_MODEL || "models/ggml-small.bin";
-const KOKORO_PYTHON = process.env.KOKORO_PYTHON || "python3";
-const TTS_WORKER = join(__dirname, "tts_worker.py");
+const BUNDLED_WHISPER = join(process.resourcesPath || "", "whisper", "whisper-cli");
+
+const WHISPER_BIN = process.env.WHISPER_BIN
+  || (existsSync(BUNDLED_WHISPER) ? BUNDLED_WHISPER : "whisper-cli");
+let whisperModel = process.env.WHISPER_MODEL || "models/ggml-small.bin";
+let kokoroPython = process.env.KOKORO_PYTHON || "python3";
+
+function configure({ model, python }) {
+  if (model && !process.env.WHISPER_MODEL) whisperModel = model;
+  if (python && !process.env.KOKORO_PYTHON) kokoroPython = python;
+}
+const TTS_WORKER = join(__dirname, "tts_worker.py").replace("app.asar", "app.asar.unpacked");
 
 // Whisper marks non-speech sounds as annotations — (clears throat), [coughing],
 // *laughs*, [BLANK_AUDIO]. Drop them; if nothing sayable is left, it wasn't speech.
@@ -31,7 +40,7 @@ async function transcribe(wavBuffer) {
   const wavPath = join(dir, "in.wav");
   try {
     await writeFile(wavPath, wavBuffer);
-    const out = await run(WHISPER_BIN, ["-m", WHISPER_MODEL, "-f", wavPath, "-nt", "-otxt"]);
+    const out = await run(WHISPER_BIN, ["-m", whisperModel, "-f", wavPath, "-nt", "-otxt"]);
     if (out.trim()) return speechOnly(out.trim());
     const txt = await readFile(`${wavPath}.txt`, "utf8").catch(() => "");
     return speechOnly(txt.trim());
@@ -55,7 +64,7 @@ class TtsEngine {
 
   start() {
     if (this.proc || this.stopped) return;
-    this.proc = spawn(KOKORO_PYTHON, [TTS_WORKER], { env: process.env });
+    this.proc = spawn(kokoroPython, [TTS_WORKER], { env: process.env });
     this.proc.stdout.on("data", (data) => this.consume(data));
     this.proc.stderr.on("data", (data) => {
       const msg = data.toString().trim();
@@ -142,4 +151,4 @@ function run(cmd, args, input) {
   });
 }
 
-module.exports = { transcribe, TtsEngine, speechOnly };
+module.exports = { transcribe, TtsEngine, speechOnly, configure };

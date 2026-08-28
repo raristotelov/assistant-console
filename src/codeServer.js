@@ -5,8 +5,8 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const net = require("node:net");
-const https = require("node:https");
-const { spawn, execFileSync } = require("node:child_process");
+const { spawn } = require("node:child_process");
+const { fetchToFile, extractTarGz } = require("./download");
 
 const VERSION = "4.135.0";
 const READY_TIMEOUT_MS = 60000;
@@ -21,29 +21,6 @@ function downloadUrl() {
   return `https://github.com/coder/code-server/releases/download/v${VERSION}/${assetName()}.tar.gz`;
 }
 
-function fetchToFile(url, dest) {
-  return new Promise((resolve, reject) => {
-    const req = https.get(url, { headers: { "user-agent": "assistant-console" } }, (res) => {
-      const { statusCode, headers } = res;
-      if (statusCode >= 300 && statusCode < 400 && headers.location) {
-        res.resume();
-        fetchToFile(headers.location, dest).then(resolve, reject);
-        return;
-      }
-      if (statusCode !== 200) {
-        res.resume();
-        reject(new Error(`download failed: HTTP ${statusCode}`));
-        return;
-      }
-      const file = fs.createWriteStream(dest);
-      res.pipe(file);
-      file.on("finish", () => file.close(() => resolve()));
-      file.on("error", reject);
-    });
-    req.on("error", reject);
-  });
-}
-
 async function ensureBinary(rootDir) {
   if (process.platform === "win32") {
     throw new Error("code-server publishes no Windows build");
@@ -54,7 +31,7 @@ async function ensureBinary(rootDir) {
   fs.mkdirSync(rootDir, { recursive: true });
   const tarball = path.join(rootDir, `${assetName()}.tar.gz`);
   await fetchToFile(downloadUrl(), tarball);
-  execFileSync("tar", ["-xzf", tarball, "-C", rootDir]);
+  extractTarGz(tarball, rootDir);
   fs.unlinkSync(tarball);
 
   if (!fs.existsSync(bin)) throw new Error("code-server binary missing after extract");

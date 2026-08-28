@@ -4,11 +4,13 @@
 
 require("dotenv/config"); // load paths (WHISPER_BIN, KOKORO_PYTHON, ...) from .env
 
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog } = require("electron");
 const path = require("node:path");
 const os = require("node:os");
 const fs = require("node:fs");
+const crypto = require("node:crypto");
 const pty = require("node-pty");
+const codeServer = require("./codeServer");
 const { transcribe, TtsEngine } = require("./speech");
 const { TranscriptReader } = require("./transcriptReader");
 const { toSpeakable } = require("./speakable");
@@ -30,14 +32,31 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
   });
   win.maximize();
   win.loadFile(path.join(__dirname, "index.html"));
 }
 
-function createSession() {
+async function createSession() {
+  const picked = await dialog.showOpenDialog(win, {
+    title: "Choose a project folder",
+    buttonLabel: "Open session",
+    properties: ["openDirectory", "createDirectory"],
+  });
+  if (picked.canceled || !picked.filePaths.length) return null;
+
   const id = ++nextSessionId;
+  const folder = picked.filePaths[0];
+  sessions.set(id, { id, folder, term: null, reader: null, pointerFile: null, editor: null });
+  return { id, folder };
+}
+
+function openTerminal(id) {
+  const session = sessions.get(id);
+  if (!session || session.term) return;
+
   const pointerFile = path.join(os.tmpdir(), `assistant-console-session-${process.pid}-${id}`);
   const shell = os.platform() === "win32"
     ? "powershell.exe"
@@ -47,7 +66,7 @@ function createSession() {
     name: "xterm-color",
     cols: 100,
     rows: 30,
-    cwd: os.homedir(),
+    cwd: session.folder,
     env: { ...process.env, ASSISTANT_CONSOLE_SESSION_FILE: pointerFile },
   });
 
@@ -64,16 +83,36 @@ function createSession() {
   });
   reader.start();
 
-  sessions.set(id, { id, term, reader, pointerFile });
-  return { id };
+  Object.assign(session, { term, reader, pointerFile });
+}
+
+async function openEditor(id) {
+  const session = sessions.get(id);
+  if (!session) return null;
+  if (session.editor) return { url: session.editor.url };
+
+  const rootDir = path.join(app.getPath("userData"), "code-server");
+  const folderKey = crypto.createHash("sha1").update(session.folder).digest("hex").slice(0, 12);
+
+  session.editor = await codeServer.start({
+    rootDir,
+    folder: session.folder,
+    userDataDir: path.join(rootDir, "user-data", folderKey),
+    extensionsDir: path.join(rootDir, "extensions"),
+    templateDir: path.join(rootDir, "user-data-template"),
+  });
+  return { url: session.editor.url };
 }
 
 function closeSession(id) {
   const session = sessions.get(id);
   if (!session) return;
-  session.reader.stop();
-  session.term.kill();
-  try { fs.unlinkSync(session.pointerFile); } catch {}
+  session.reader?.stop();
+  session.term?.kill();
+  session.editor?.proc.kill();
+  if (session.pointerFile) {
+    try { fs.unlinkSync(session.pointerFile); } catch {}
+  }
   sessions.delete(id);
 }
 
@@ -96,19 +135,22 @@ app.whenReady().then(() => {
   ipcMain.handle("session:create", () => createSession());
   ipcMain.on("session:close", (_e, id) => closeSession(id));
 
-  ipcMain.on("term:input", (_e, { id, data }) => sessions.get(id)?.term.write(data));
-  ipcMain.on("term:resize", (_e, { id, cols, rows }) => sessions.get(id)?.term.resize(cols, rows));
+  ipcMain.handle("term:open", (_e, id) => openTerminal(id));
+  ipcMain.handle("editor:open", (_e, id) => openEditor(id));
+
+  ipcMain.on("term:input", (_e, { id, data }) => sessions.get(id)?.term?.write(data));
+  ipcMain.on("term:resize", (_e, { id, cols, rows }) => sessions.get(id)?.term?.resize(cols, rows));
   ipcMain.on("term:send-line", (_e, { id, text }) => {
     const session = sessions.get(id);
-    if (!session) return;
+    if (!session?.term) return;
     session.term.write(text);
-    setTimeout(() => sessions.get(id)?.term.write("\r"), SUBMIT_KEY_DELAY_MS);
+    setTimeout(() => sessions.get(id)?.term?.write("\r"), SUBMIT_KEY_DELAY_MS);
   });
 
   // reading toggle, per session — when off, that session's replies aren't spoken.
   ipcMain.on("voice:reading", (_e, { id, on }) => {
     const session = sessions.get(id);
-    if (!session) return;
+    if (!session?.reader) return;
     if (on) session.reader.enable(); else session.reader.disable();
   });
 

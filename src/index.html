@@ -44,15 +44,34 @@
     #main { flex:1; display:flex; flex-direction:column; min-width:0; }
     #toolbar { display:flex; gap:8px; align-items:center; padding:10px 16px;
       border-bottom:1px solid var(--border); }
-    #toolbar.hidden, #terminals.hidden, footer.hidden, #start.hidden { display:none; }
+    #toolbar.hidden, #panes.hidden, footer.hidden, #start.hidden { display:none; }
     #stats { display:flex; gap:18px; align-items:center; margin-left:auto;
       color:var(--muted); font-size:12px; min-width:0; overflow:hidden; }
     .stat { white-space:nowrap; }
     .stat b { color:var(--text); font-weight:600; }
 
-    #terminals { flex:1; position:relative; min-height:0; }
-    .term-pane { position:absolute; inset:0; padding:8px; display:none; }
-    .term-pane.active { display:block; }
+    #panes { flex:1; position:relative; min-height:0; }
+    .session-pane { position:absolute; inset:0; display:none; flex-direction:column; }
+    .session-pane.active { display:flex; }
+
+    .editor-slot { flex:3; min-height:0; margin:8px 8px 0; display:flex; }
+    .term-slot { flex:2; min-height:0; margin:8px; display:flex; }
+    .editor-slot.filled, .term-slot.filled { display:block; }
+    .editor-slot webview { width:100%; height:100%; border:1px solid var(--border);
+      border-radius:8px; background:#1e1e1e; }
+
+    .divider { flex:none; height:10px; margin:0 8px; cursor:row-resize; position:relative; }
+    .divider::after { content:""; position:absolute; left:0; right:0; top:4px; height:2px;
+      background:var(--border); border-radius:1px; }
+    .divider:hover::after, .session-pane.resizing .divider::after { background:var(--accent); }
+    .session-pane.resizing webview { pointer-events:none; }
+
+    .slot-add { flex:1; display:flex; flex-direction:column; align-items:center;
+      justify-content:center; gap:12px; border:1px dashed var(--border);
+      border-radius:10px; color:var(--muted); }
+    .slot-add button { width:64px; height:64px; border-radius:50%; border:none;
+      background:var(--accent); color:#fff; font-size:32px; line-height:1; cursor:pointer; }
+    .slot-add button:disabled { opacity:.4; cursor:default; }
 
     #start { flex:1; display:flex; flex-direction:column; align-items:center;
       justify-content:center; gap:16px; }
@@ -102,11 +121,11 @@
     </header>
 
     <div id="start">
-      <button id="start-btn" title="Open a terminal">+</button>
-      <p>Open a terminal to start a Claude session</p>
+      <button id="start-btn" title="New session">+</button>
+      <p>Pick a project folder to start a session</p>
     </div>
 
-    <div id="terminals" class="hidden"></div>
+    <div id="panes" class="hidden"></div>
 
     <footer class="hidden">
       <div id="heard"></div>

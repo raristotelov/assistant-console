@@ -8,7 +8,12 @@ contextBridge.exposeInMainWorld("api", {
     onStats: (cb) => ipcRenderer.on("session:stats", (_e, payload) => cb(payload)),
   },
 
+  editor: {
+    open: (id) => ipcRenderer.invoke("editor:open", id),
+  },
+
   term: {
+    open: (id) => ipcRenderer.invoke("term:open", id),
     input: (id, data) => ipcRenderer.send("term:input", { id, data }),
     resize: (id, cols, rows) => ipcRenderer.send("term:resize", { id, cols, rows }),
     sendLine: (id, text) => ipcRenderer.send("term:send-line", { id, text }),

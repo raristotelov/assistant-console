@@ -5,7 +5,7 @@
 
 const sidebarEl = document.getElementById("sidebar");
 const sessionListEl = document.getElementById("session-list");
-const terminalsEl = document.getElementById("terminals");
+const panesEl = document.getElementById("panes");
 const toolbarEl = document.getElementById("toolbar");
 const startEl = document.getElementById("start");
 const footerEl = document.querySelector("footer");
@@ -27,11 +27,89 @@ function formatTokens(n) {
 }
 
 async function createSession() {
-  const { id } = await window.api.sessions.create();
+  const created = await window.api.sessions.create();
+  if (!created) return;
+  const { id, folder } = created;
 
   const pane = document.createElement("div");
-  pane.className = "term-pane";
-  terminalsEl.appendChild(pane);
+  pane.className = "session-pane";
+
+  const editorSlot = document.createElement("div");
+  editorSlot.className = "editor-slot";
+  const editorAdd = makeSlotAdd("VS Code");
+  editorSlot.appendChild(editorAdd.wrap);
+
+  const termSlot = document.createElement("div");
+  termSlot.className = "term-slot";
+  const termAdd = makeSlotAdd("Terminal for Claude Code");
+  termSlot.appendChild(termAdd.wrap);
+
+  pane.append(editorSlot, termSlot);
+  panesEl.appendChild(pane);
+
+  const session = {
+    id, folder, pane, editorSlot, termSlot, editorAdd, termAdd,
+    term: null, fit: null, editorUrl: null, stats: null, reading: false, exited: false,
+  };
+  sessions.set(id, session);
+  pane.insertBefore(makeDivider(session), termSlot);
+
+  editorAdd.button.addEventListener("click", () => addEditor(session));
+  termAdd.button.addEventListener("click", () => addTerminal(session));
+
+  renderSidebar();
+  activate(id);
+}
+
+function makeDivider(session) {
+  const divider = document.createElement("div");
+  divider.className = "divider";
+  divider.title = "Drag to resize";
+
+  const onMove = (e) => {
+    const rect = session.pane.getBoundingClientRect();
+    const pct = ((e.clientY - rect.top) / rect.height) * 100;
+    session.editorSlot.style.flex = `0 0 ${Math.min(85, Math.max(15, pct))}%`;
+    fitActive();
+  };
+
+  const onUp = (e) => {
+    divider.releasePointerCapture(e.pointerId);
+    divider.removeEventListener("pointermove", onMove);
+    session.pane.classList.remove("resizing");
+    fitActive();
+  };
+
+  divider.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    divider.setPointerCapture(e.pointerId);
+    session.pane.classList.add("resizing");
+    divider.addEventListener("pointermove", onMove);
+    divider.addEventListener("pointerup", onUp, { once: true });
+  });
+
+  return divider;
+}
+
+function makeSlotAdd(label) {
+  const wrap = document.createElement("div");
+  wrap.className = "slot-add";
+  const button = document.createElement("button");
+  button.textContent = "+";
+  button.title = `Add ${label}`;
+  const caption = document.createElement("span");
+  caption.textContent = label;
+  wrap.append(button, caption);
+  return { wrap, button, caption };
+}
+
+async function addTerminal(session) {
+  if (session.term) return;
+  session.termAdd.button.disabled = true;
+  await window.api.term.open(session.id);
+
+  session.termAdd.wrap.remove();
+  session.termSlot.classList.add("filled");
 
   const term = new Terminal({
     fontFamily: "Menlo, Monaco, monospace",
@@ -41,19 +119,40 @@ async function createSession() {
   });
   const fit = new FitAddon.FitAddon();
   term.loadAddon(fit);
-  term.open(pane);
-  term.onData((data) => window.api.term.input(id, data));
+  term.open(session.termSlot);
+  term.onData((data) => window.api.term.input(session.id, data));
 
-  sessions.set(id, { id, term, fit, pane, stats: null, reading: false, exited: false });
-  renderSidebar();
-  activate(id);
+  session.term = term;
+  session.fit = fit;
+  fitActive();
+  term.focus();
+}
+
+async function addEditor(session) {
+  if (session.editorUrl) return;
+  session.editorAdd.button.disabled = true;
+  session.editorAdd.caption.textContent = "Starting VS Code…";
+  try {
+    const { url } = await window.api.editor.open(session.id);
+    const view = document.createElement("webview");
+    view.setAttribute("src", url);
+    session.editorAdd.wrap.remove();
+    session.editorSlot.classList.add("filled");
+    session.editorSlot.appendChild(view);
+    session.editorUrl = url;
+    fitActive();
+  } catch (e) {
+    session.editorAdd.button.disabled = false;
+    session.editorAdd.caption.textContent = "VS Code";
+    setStatus(`code-server failed: ${e.message || e}`);
+  }
 }
 
 function closeSession(id) {
   const session = sessions.get(id);
   if (!session) return;
   window.api.sessions.close(id);
-  session.term.dispose();
+  session.term?.dispose();
   session.pane.remove();
   sessions.delete(id);
 
@@ -74,15 +173,12 @@ function activate(id) {
   renderSidebar();
   syncChrome();
   fitActive();
-  session.term.focus();
+  session.term?.focus();
 }
 
 function sessionName(session) {
-  if (session.stats?.cwd) {
-    const parts = session.stats.cwd.split("/").filter(Boolean);
-    if (parts.length) return parts[parts.length - 1];
-  }
-  return `Session ${session.id}`;
+  const parts = session.folder.split("/").filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : `Session ${session.id}`;
 }
 
 function renderSidebar() {
@@ -93,7 +189,7 @@ function renderSidebar() {
     item.classList.toggle("active", session.id === activeId);
     item.classList.toggle("reading", session.reading);
     item.classList.toggle("exited", session.exited);
-    item.title = session.stats?.cwd || sessionName(session);
+    item.title = session.folder;
     item.addEventListener("click", () => activate(session.id));
 
     const dot = document.createElement("span");
@@ -120,7 +216,7 @@ function renderSidebar() {
 function syncChrome() {
   const hasSessions = sessions.size > 0;
   startEl.classList.toggle("hidden", hasSessions);
-  terminalsEl.classList.toggle("hidden", !hasSessions);
+  panesEl.classList.toggle("hidden", !hasSessions);
   toolbarEl.classList.toggle("hidden", !hasSessions);
   footerEl.classList.toggle("hidden", !hasSessions);
 
@@ -148,17 +244,17 @@ function renderStats(stats) {
 
 function fitActive() {
   const session = sessions.get(activeId);
-  if (!session) return;
+  if (!session?.fit) return;
   session.fit.fit();
   window.api.term.resize(session.id, session.term.cols, session.term.rows);
 }
 
-window.api.term.onData(({ id, data }) => sessions.get(id)?.term.write(data));
+window.api.term.onData(({ id, data }) => sessions.get(id)?.term?.write(data));
 window.api.term.onExit(({ id }) => {
   const session = sessions.get(id);
   if (!session) return;
   session.exited = true;
-  session.term.write("\r\n[process exited]\r\n");
+  session.term?.write("\r\n[process exited]\r\n");
   renderSidebar();
 });
 
@@ -236,7 +332,7 @@ window.api.voice.onCancelled((id) => {
 });
 
 function writeToActive(text) {
-  sessions.get(activeId)?.term.write(text);
+  sessions.get(activeId)?.term?.write(text);
 }
 
 // --- read toggle: per session ---------------------------------------------
@@ -273,7 +369,7 @@ async function startListening() {
         try {
           const text = await window.api.voice.transcribe(wav);
           const session = sessions.get(activeId);
-          if (text && session) {
+          if (text && session?.term) {
             // Barge-in: real words confirmed, so stop the assistant talking.
             stopSpeaking();
             showHeard(text);

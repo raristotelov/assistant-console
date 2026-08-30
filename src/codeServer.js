@@ -162,18 +162,24 @@ async function start({ rootDir, folder, userDataDir, extensionsDir, templateDir 
   const proc = spawn(
     bin,
     [
-      "--bind-addr", `127.0.0.1:${port}`,
-      "--auth", "none",
+      "--bind-addr",
+      `127.0.0.1:${port}`,
+      "--auth",
+      "none",
       "--disable-telemetry",
       "--disable-update-check",
-      "--user-data-dir", userDataDir,
-      "--extensions-dir", extensionsDir,
+      "--user-data-dir",
+      userDataDir,
+      "--extensions-dir",
+      extensionsDir,
     ],
     { stdio: ["ignore", "pipe", "pipe"] },
   );
 
   let exited = false;
-  proc.on("exit", () => { exited = true; });
+  proc.on("exit", () => {
+    exited = true;
+  });
   proc.stderr.on("data", (d) => console.error(`[code-server] ${d}`));
 
   await waitUntilServing(port, () => !exited);

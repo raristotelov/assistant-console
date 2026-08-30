@@ -12,7 +12,7 @@ test("keeps plain prose untouched", () => {
 test("strips emphasis and inline code markers", () => {
   assert.equal(
     norm(toSpeakable("**Bold** and *italic* and `inline code` stay as words.")),
-    "Bold and italic and inline code stay as words."
+    "Bold and italic and inline code stay as words.",
   );
   assert.equal(norm(toSpeakable("__strong__ and _quiet_ words")), "strong and quiet words");
 });
@@ -20,21 +20,21 @@ test("strips emphasis and inline code markers", () => {
 test("strips heading, list and quote markers", () => {
   assert.equal(
     norm(toSpeakable("## Heading\n- bullet one\n* bullet two\n1. numbered\n> quoted")),
-    "Heading bullet one bullet two numbered quoted"
+    "Heading bullet one bullet two numbered quoted",
   );
 });
 
 test("keeps link text and drops the url", () => {
   assert.equal(
     norm(toSpeakable("See [the docs](https://example.com/x) for more.")),
-    "See the docs for more."
+    "See the docs for more.",
   );
 });
 
 test("skips fenced code and appends the notice", () => {
   assert.equal(
     norm(toSpeakable("Here:\n```js\nconst x = 1;\n```\nDone.")),
-    norm(`Here: Done. ${NOTICE}`)
+    norm(`Here: Done. ${NOTICE}`),
   );
 });
 
@@ -45,14 +45,14 @@ test("speaks only the notice when the reply is nothing but code", () => {
 test("skips an unclosed fence rather than reading it", () => {
   assert.equal(
     norm(toSpeakable("Unclosed fence:\n```js\nconst y = 2;")),
-    norm(`Unclosed fence: ${NOTICE}`)
+    norm(`Unclosed fence: ${NOTICE}`),
   );
 });
 
 test("skips tables and appends the notice", () => {
   assert.equal(
     norm(toSpeakable("| a | b |\n|---|---|\n| 1 | 2 |\nAfter table.")),
-    norm(`After table. ${NOTICE}`)
+    norm(`After table. ${NOTICE}`),
   );
 });
 
@@ -62,7 +62,10 @@ test("removes emoji, including modifiers and zwj sequences", () => {
 });
 
 test("spells out short all-caps acronyms", () => {
-  assert.equal(toSpeakable("Open the PR and check the API via MCP."), "Open the P R and check the A P I via M C P.");
+  assert.equal(
+    toSpeakable("Open the PR and check the API via MCP."),
+    "Open the P R and check the A P I via M C P.",
+  );
   assert.equal(toSpeakable("Two PRs are waiting."), "Two P Rs are waiting.");
 });
 

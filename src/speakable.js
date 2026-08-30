@@ -21,7 +21,7 @@ function toSpeakable(markdown) {
       line
         .replace(/^\s{0,3}#{1,6}\s+/, "")
         .replace(/^\s*(?:[-*+]|\d+[.)])\s+/, "")
-        .replace(/^\s*>\s?/, "")
+        .replace(/^\s*>\s?/, ""),
     )
     .join("\n");
 
@@ -33,7 +33,10 @@ function toSpeakable(markdown) {
     .replace(/\*([^*]+)\*/g, "$1")
     .replace(/\b_([^_]+)_\b/g, "$1")
     .replace(/[*`#~]/g, " ")
-    .replace(/[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{FE0E}\u{FE0F}\u{200D}\u{20E3}]/gu, " ")
+    .replace(
+      /\p{Extended_Pictographic}|\p{Emoji_Modifier}|\u{FE0E}|\u{FE0F}|\u{200D}|\u{20E3}/gu,
+      " ",
+    )
     .replace(/\b([A-Z]{2,5})(s?)\b/g, (_m, letters, plural) => letters.split("").join(" ") + plural)
     .replace(/[ \t]{2,}/g, " ")
     .replace(/\n{2,}/g, "\n")

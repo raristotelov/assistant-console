@@ -12,13 +12,13 @@ second.
 
 ## Suites
 
-| File | Tests | Covers |
-|---|---|---|
-| `test/speakable.test.js` | 12 | markdown stripping, code fences and tables → notice, emoji, acronym expansion |
-| `test/speechOnly.test.js` | 7 | whisper non-speech annotations, non-latin speech kept |
-| `test/ttsEngine.test.js` | 7 | worker framing: split writes, several frames per write, newline bytes inside payloads, error headers |
-| `test/transcriptReader.test.js` | 9 | history skipping, entry-type filtering, `/clear` session switch, half-written lines, malformed JSON, missing files |
-| `test/tts_worker_test.py` | 10 | sentence splitting, inbox routing and cancel threshold |
+| File                            | Tests | Covers                                                                                                             |
+| ------------------------------- | ----- | ------------------------------------------------------------------------------------------------------------------ |
+| `test/speakable.test.js`        | 12    | markdown stripping, code fences and tables → notice, emoji, acronym expansion                                      |
+| `test/speechOnly.test.js`       | 7     | whisper non-speech annotations, non-latin speech kept                                                              |
+| `test/ttsEngine.test.js`        | 7     | worker framing: split writes, several frames per write, newline bytes inside payloads, error headers               |
+| `test/transcriptReader.test.js` | 9     | history skipping, entry-type filtering, `/clear` session switch, half-written lines, malformed JSON, missing files |
+| `test/tts_worker_test.py`       | 10    | sentence splitting, inbox routing and cancel threshold                                                             |
 
 Tests drive `TtsEngine.consume()` and `TranscriptReader.poll()` directly rather
 than spawning processes or waiting on timers, so they are deterministic.

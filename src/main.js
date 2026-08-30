@@ -21,6 +21,7 @@ const SUBMIT_KEY_DELAY_MS = 150;
 let win;
 let tts;
 let replyId = 0;
+const replySessions = new Map();
 let nextSessionId = 0;
 const sessions = new Map();
 
@@ -38,6 +39,15 @@ function createWindow() {
   });
   win.maximize();
   win.loadFile(path.join(__dirname, "index.html"));
+  win.on("closed", () => {
+    win = null;
+    for (const id of [...sessions.keys()]) closeSession(id);
+  });
+}
+
+function send(channel, payload) {
+  if (!win || win.isDestroyed()) return;
+  win.webContents.send(channel, payload);
 }
 
 async function createSession() {
@@ -60,7 +70,7 @@ function ensureVoiceReady() {
   if (voiceReady) return voiceReady;
 
   const rootDir = app.getPath("userData");
-  const onStatus = (text) => win?.webContents.send("voice:status", text);
+  const onStatus = (text) => send("voice:status", text);
 
   voiceReady = (async () => {
     const model = await ensureWhisperModel(rootDir, onStatus);
@@ -95,9 +105,7 @@ function openTerminal(id) {
   if (!session || session.term) return;
 
   const pointerFile = path.join(os.tmpdir(), `assistant-console-session-${process.pid}-${id}`);
-  const shell = os.platform() === "win32"
-    ? "powershell.exe"
-    : (process.env.SHELL || "/bin/zsh");
+  const shell = os.platform() === "win32" ? "powershell.exe" : process.env.SHELL || "/bin/zsh";
 
   const term = pty.spawn(shell, [], {
     name: "xterm-color",
@@ -110,16 +118,19 @@ function openTerminal(id) {
     }),
   });
 
-  term.onData((data) => win?.webContents.send("term:data", { id, data }));
-  term.onExit(() => win?.webContents.send("term:exit", { id }));
+  term.onData((data) => send("term:data", { id, data }));
+  term.onExit(() => send("term:exit", { id }));
 
   const reader = new TranscriptReader(pointerFile, {
     onReply: (text) => {
       const speakable = toSpeakable(text);
       if (!speakable) return;
-      tts.speak(++replyId, speakable);
+      replySessions.set(++replyId, id);
+      tts.speak(replyId, speakable);
     },
-    onStats: (stats) => win?.webContents.send("session:stats", { id, stats }),
+    onStats: (stats) => send("session:stats", { id, stats }),
+    onStatus: (status) => send("session:status", { id, status }),
+    onAnswer: () => send("session:answer", { id }),
   });
   reader.start();
 
@@ -164,7 +175,9 @@ function closeSession(id) {
   session.term?.kill();
   session.editor?.proc.kill();
   if (session.pointerFile) {
-    try { fs.unlinkSync(session.pointerFile); } catch {}
+    try {
+      fs.unlinkSync(session.pointerFile);
+    } catch {}
   }
   sessions.delete(id);
 }
@@ -174,12 +187,14 @@ app.whenReady().then(() => {
 
   tts = new TtsEngine({
     onChunk: (header, wav) => {
-      win?.webContents.send("voice:audio-chunk", {
+      send("voice:audio-chunk", {
         id: header.id,
+        sessionId: replySessions.get(header.id) ?? null,
         seq: header.seq,
         last: header.last,
         wav: wav.buffer.slice(wav.byteOffset, wav.byteOffset + wav.byteLength),
       });
+      if (header.last) replySessions.delete(header.id);
     },
     onError: (msg) => console.error(`[tts] ${msg}`),
   });
@@ -213,7 +228,7 @@ app.whenReady().then(() => {
 
   ipcMain.on("voice:cancel", () => {
     tts?.cancel(replyId);
-    win?.webContents.send("voice:cancelled", replyId);
+    send("voice:cancelled", replyId);
   });
 
   // STT: renderer sends a captured utterance (WAV), we return the transcript.

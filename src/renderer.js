@@ -17,13 +17,12 @@ const heardEl = document.getElementById("heard");
 const sessions = new Map();
 let activeId = null;
 
-function setStatus(s) { statusEl.textContent = s; }
+function setStatus(s) {
+  statusEl.textContent = s;
+}
 
-function formatTokens(n) {
-  if (!n) return "0";
-  if (n >= 1e6) return `${(n / 1e6).toFixed(1)}M`;
-  if (n >= 1e3) return `${(n / 1e3).toFixed(1)}k`;
-  return String(n);
+function token(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
 async function createSession() {
@@ -48,8 +47,22 @@ async function createSession() {
   panesEl.appendChild(pane);
 
   const session = {
-    id, folder, pane, editorSlot, termSlot, editorAdd, termAdd,
-    term: null, fit: null, editorUrl: null, stats: null, reading: false, exited: false,
+    id,
+    folder,
+    pane,
+    editorSlot,
+    termSlot,
+    editorAdd,
+    termAdd,
+    term: null,
+    fit: null,
+    editorUrl: null,
+    stats: null,
+    reading: false,
+    exited: false,
+    status: "idle",
+    unread: false,
+    speaking: false,
   };
   sessions.set(id, session);
   pane.insertBefore(makeDivider(session), termSlot);
@@ -95,7 +108,7 @@ function makeSlotAdd(label) {
   const wrap = document.createElement("div");
   wrap.className = "slot-add";
   const button = document.createElement("button");
-  button.textContent = "+";
+  button.appendChild(glyph(GLYPHS.plus, "glyph-md"));
   button.title = `Add ${label}`;
   const caption = document.createElement("span");
   caption.textContent = label;
@@ -114,7 +127,7 @@ async function addTerminal(session) {
   const term = new Terminal({
     fontFamily: "Menlo, Monaco, monospace",
     fontSize: 13,
-    theme: { background: "#24292e", foreground: "#d1d5da" },
+    theme: { background: token("--bg"), foreground: token("--text") },
     cursorBlink: true,
   });
   const fit = new FitAddon.FitAddon();
@@ -169,6 +182,7 @@ function activate(id) {
   const session = sessions.get(id);
   if (!session) return;
   activeId = id;
+  session.unread = false;
   for (const other of sessions.values()) other.pane.classList.toggle("active", other.id === id);
   renderSidebar();
   syncChrome();
@@ -176,39 +190,113 @@ function activate(id) {
   session.term?.focus();
 }
 
-function sessionName(session) {
-  const parts = session.folder.split("/").filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : `Session ${session.id}`;
+const ICON_PATHS = {
+  mic: {
+    on: "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3",
+    off: "M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3M3 3l18 18",
+  },
+  speaker: {
+    on: "M4 9v6h4l5 4V5L8 9H4zM16.5 8.5a5 5 0 0 1 0 7M19 6a9 9 0 0 1 0 12",
+    off: "M4 9v6h4l5 4V5L8 9H4zM3 3l18 18",
+  },
+};
+
+const GLYPHS = {
+  plus: "M12 5v14M5 12h14",
+  close: "M6 6l12 12M18 6L6 18",
+  chevronLeft: "M11 6l-6 6 6 6M18 6l-6 6 6 6",
+  chevronRight: "M13 6l6 6-6 6M6 6l6 6-6 6",
+};
+
+function glyph(d, className) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.classList.add(className);
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", d);
+  path.setAttribute("stroke", "currentColor");
+  path.setAttribute("stroke-width", "2");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(path);
+  return svg;
+}
+
+function makeIcon(name, state, title, onClick) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.classList.add("session-icon");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", ICON_PATHS[name][state === "off" ? "off" : "on"]);
+  path.setAttribute("stroke", "currentColor");
+  path.setAttribute("stroke-width", "2");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  svg.appendChild(path);
+  const wrap = document.createElement(onClick ? "button" : "span");
+  wrap.className = `session-icon-slot ${name} ${state}`;
+  wrap.title = title;
+  wrap.appendChild(svg);
+  if (onClick) {
+    wrap.addEventListener("click", (e) => {
+      e.stopPropagation();
+      onClick();
+    });
+  }
+  return wrap;
+}
+
+function toggleReading(session) {
+  session.reading = !session.reading;
+  window.api.voice.setReading(session.id, session.reading);
+  syncChrome();
+  renderSidebar();
 }
 
 function renderSidebar() {
   sessionListEl.textContent = "";
   for (const session of sessions.values()) {
     const item = document.createElement("div");
-    item.className = "session-item";
+    item.className = `session-item ${sessionStatus(session)}`;
     item.classList.toggle("active", session.id === activeId);
-    item.classList.toggle("reading", session.reading);
-    item.classList.toggle("exited", session.exited);
     item.title = session.folder;
     item.addEventListener("click", () => activate(session.id));
 
     const dot = document.createElement("span");
     dot.className = "dot";
 
+    const monogram = document.createElement("span");
+    monogram.className = "monogram";
+    monogram.textContent = sessionMonogram(session);
+
     const name = document.createElement("span");
     name.className = "session-name";
     name.textContent = sessionName(session);
 
+    const icons = document.createElement("span");
+    icons.className = "session-icons";
+    icons.append(
+      makeIcon("mic", micState(session, listening, activeId), "Voice input"),
+      makeIcon(
+        "speaker",
+        speakerState(session),
+        session.reading ? "Stop reading this session" : "Read this session aloud",
+        () => toggleReading(session),
+      ),
+    );
+
     const close = document.createElement("button");
     close.className = "session-close";
-    close.textContent = "×";
+    close.appendChild(glyph(GLYPHS.close, "glyph-sm"));
     close.title = "Close session";
     close.addEventListener("click", (e) => {
       e.stopPropagation();
       closeSession(session.id);
     });
 
-    item.append(dot, name, close);
+    item.append(dot, monogram, name, icons, close);
     sessionListEl.appendChild(item);
   }
 }
@@ -227,9 +315,19 @@ function syncChrome() {
 }
 
 function renderStats(stats) {
-  const set = (id, value) => { document.getElementById(id).textContent = value; };
+  const set = (id, value) => {
+    document.getElementById(id).textContent = value;
+  };
   if (!stats) {
-    for (const id of ["stat-context", "stat-in", "stat-out", "stat-cache-read", "stat-cache-write", "stat-messages"]) set(id, "—");
+    for (const id of [
+      "stat-context",
+      "stat-in",
+      "stat-out",
+      "stat-cache-read",
+      "stat-cache-write",
+      "stat-messages",
+    ])
+      set(id, "—");
     set("stat-model", "—");
     return;
   }
@@ -266,11 +364,27 @@ window.api.sessions.onStats(({ id, stats }) => {
   if (id === activeId) renderStats(stats);
 });
 
+window.api.sessions.onStatus(({ id, status }) => {
+  const session = sessions.get(id);
+  if (!session) return;
+  session.status = status;
+  renderSidebar();
+});
+
+window.api.sessions.onAnswer(({ id }) => {
+  const session = sessions.get(id);
+  if (!session) return;
+  if (id !== activeId) session.unread = true;
+  renderSidebar();
+});
+
 document.getElementById("new-session").addEventListener("click", createSession);
 document.getElementById("start-btn").addEventListener("click", createSession);
 document.getElementById("collapse").addEventListener("click", () => {
   const collapsed = sidebarEl.classList.toggle("collapsed");
-  document.getElementById("collapse").textContent = collapsed ? "»" : "«";
+  document
+    .getElementById("collapse-path")
+    .setAttribute("d", collapsed ? GLYPHS.chevronRight : GLYPHS.chevronLeft);
   setTimeout(fitActive, 160);
 });
 
@@ -296,11 +410,31 @@ window.api.voice.onAudioChunk((chunk) => {
   if (!playing) playNext();
 });
 
+function setSpeaking(id) {
+  let changed = false;
+  for (const session of sessions.values()) {
+    const next = session.id === id;
+    if (session.speaking !== next) {
+      session.speaking = next;
+      changed = true;
+    }
+  }
+  if (changed) renderSidebar();
+}
+
 async function playNext() {
   const chunk = playQueue.shift();
-  if (!chunk) { playing = false; return; }
-  if (chunk.id <= lastCancelledReplyId) { playNext(); return; }
+  if (!chunk) {
+    playing = false;
+    setSpeaking(null);
+    return;
+  }
+  if (chunk.id <= lastCancelledReplyId) {
+    playNext();
+    return;
+  }
   playing = true;
+  setSpeaking(chunk.sessionId);
   audioCtx ||= new (window.AudioContext || window.webkitAudioContext)();
   try {
     const decoded = await audioCtx.decodeAudioData(chunk.wav.slice(0));
@@ -323,7 +457,13 @@ function stopSpeaking() {
   lastCancelledReplyId = lastSeenReplyId;
   window.api.voice.cancelSpeech();
   playQueue = [];
-  if (currentSource) { try { currentSource.stop(); } catch {} currentSource = null; }
+  if (currentSource) {
+    try {
+      currentSource.stop();
+    } catch {}
+    currentSource = null;
+  }
+  setSpeaking(null);
 }
 
 window.api.voice.onStatus((text) => setStatus(text || (listening ? "listening" : "terminal")));
@@ -341,10 +481,7 @@ function writeToActive(text) {
 readBtn.addEventListener("click", () => {
   const session = sessions.get(activeId);
   if (!session) return;
-  session.reading = !session.reading;
-  window.api.voice.setReading(session.id, session.reading);
-  syncChrome();
-  renderSidebar();
+  toggleReading(session);
 });
 
 document.getElementById("stop-speak").addEventListener("click", stopSpeaking);
@@ -354,7 +491,8 @@ let vad = null;
 let listening = false;
 
 micBtn.addEventListener("click", async () => {
-  if (listening) stopListening(); else await startListening();
+  if (listening) stopListening();
+  else await startListening();
 });
 
 async function startListening() {
@@ -393,6 +531,7 @@ async function startListening() {
   micBtn.textContent = "Stop listening";
   micBtn.classList.add("active");
   setStatus("listening");
+  renderSidebar();
 }
 
 function stopListening() {
@@ -401,18 +540,29 @@ function stopListening() {
   micBtn.textContent = "Start listening";
   micBtn.classList.remove("active");
   setStatus("terminal");
+  renderSidebar();
 }
 
 // --- WAV encoding (Float32 mono -> 16-bit PCM WAV) -> ArrayBuffer -----------
 function encodeWav(float32, sampleRate) {
   const buffer = new ArrayBuffer(44 + float32.length * 2);
   const view = new DataView(buffer);
-  const w = (off, s) => { for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i)); };
-  w(0, "RIFF"); view.setUint32(4, 36 + float32.length * 2, true); w(8, "WAVE");
-  w(12, "fmt "); view.setUint32(16, 16, true); view.setUint16(20, 1, true);
-  view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true);
-  view.setUint16(34, 16, true); w(36, "data"); view.setUint32(40, float32.length * 2, true);
+  const w = (off, s) => {
+    for (let i = 0; i < s.length; i++) view.setUint8(off + i, s.charCodeAt(i));
+  };
+  w(0, "RIFF");
+  view.setUint32(4, 36 + float32.length * 2, true);
+  w(8, "WAVE");
+  w(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  w(36, "data");
+  view.setUint32(40, float32.length * 2, true);
   let off = 44;
   for (let i = 0; i < float32.length; i++, off += 2) {
     const s = Math.max(-1, Math.min(1, float32[i]));

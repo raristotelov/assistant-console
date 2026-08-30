@@ -22,13 +22,13 @@ session starts in the directory you choose.
 
 ## IPC
 
-| Channel | Direction | Purpose |
-|---|---|---|
-| `term:data` | main → renderer | pty output to draw |
-| `term:input` | renderer → main | keystrokes |
-| `term:resize` | renderer → main | cols/rows after a fit |
+| Channel          | Direction       | Purpose                               |
+| ---------------- | --------------- | ------------------------------------- |
+| `term:data`      | main → renderer | pty output to draw                    |
+| `term:input`     | renderer → main | keystrokes                            |
+| `term:resize`    | renderer → main | cols/rows after a fit                 |
 | `term:send-line` | renderer → main | send a whole line (voice or send box) |
-| `term:exit` | main → renderer | pty exited |
+| `term:exit`      | main → renderer | pty exited                            |
 
 ## Submitting a line
 

@@ -50,7 +50,7 @@ test("handles several frames arriving in one write", () => {
     Buffer.concat([
       frame({ id: 3, seq: 0, len: a.length, last: false }, a),
       frame({ id: 3, seq: 1, len: b.length, last: true }, b),
-    ])
+    ]),
   );
   assert.equal(chunks.length, 2);
   assert.deepEqual(chunks[0].wav, a);

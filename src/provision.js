@@ -4,8 +4,7 @@ const { spawn } = require("node:child_process");
 const { fetchToFile, extractTarGz } = require("./download");
 
 const WHISPER_MODEL_FILE = "ggml-small.bin";
-const WHISPER_MODEL_URL =
-  `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${WHISPER_MODEL_FILE}`;
+const WHISPER_MODEL_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${WHISPER_MODEL_FILE}`;
 
 const PYTHON_TAG = "20260825";
 const PYTHON_VERSION = "3.11.16";

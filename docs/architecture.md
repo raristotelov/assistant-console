@@ -2,12 +2,12 @@
 
 ## Processes
 
-| Process | Runs | Holds |
-|---|---|---|
-| Electron main | Node | pty, transcript reader, TTS engine, IPC |
-| Renderer | Chromium | xterm.js, VAD mic loop, Web Audio playback |
-| Shell (pty child) | zsh → `claude` | the real Claude Code session |
-| TTS worker | Python 3.11 | Kokoro model, resident across replies |
+| Process           | Runs           | Holds                                      |
+| ----------------- | -------------- | ------------------------------------------ |
+| Electron main     | Node           | pty, transcript reader, TTS engine, IPC    |
+| Renderer          | Chromium       | xterm.js, VAD mic loop, Web Audio playback |
+| Shell (pty child) | zsh → `claude` | the real Claude Code session               |
+| TTS worker        | Python 3.11    | Kokoro model, resident across replies      |
 
 Renderer never touches Node APIs directly — `preload.js` exposes `window.term`
 and `window.voice` over `contextBridge`.
@@ -48,7 +48,7 @@ how the SessionStart hook supplies it.
 
 - `speakable.js` and the `speechOnly` filter in `speech.js` are pure functions —
   all text policy lives there and is unit tested.
-- `transcriptReader.js` only decides *what text to speak*; it knows nothing
+- `transcriptReader.js` only decides _what text to speak_; it knows nothing
   about audio.
 - `speech.js` owns process lifecycles (whisper per call, TTS worker resident).
 - `renderer.js` owns playback order and barge-in; main owns synthesis and cancel.

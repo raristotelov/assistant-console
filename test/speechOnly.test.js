@@ -30,9 +30,12 @@ test("keeps real speech", () => {
 test("keeps real speech mixed with annotations", () => {
   assert.equal(
     speechOnly("(clears throat) let's continue with ticket twelve"),
-    "let's continue with ticket twelve"
+    "let's continue with ticket twelve",
   );
-  assert.equal(speechOnly("[coughing] can you check the board *laughs*"), "can you check the board");
+  assert.equal(
+    speechOnly("[coughing] can you check the board *laughs*"),
+    "can you check the board",
+  );
 });
 
 test("keeps non-latin speech", () => {

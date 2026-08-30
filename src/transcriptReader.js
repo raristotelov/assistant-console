@@ -15,10 +15,13 @@ const emptyStats = () => ({
 });
 
 class TranscriptReader {
-  constructor(pointerFile, { onReply, onStats } = {}) {
+  constructor(pointerFile, { onReply, onStats, onStatus, onAnswer } = {}) {
     this.pointerFile = pointerFile;
     this.onReply = onReply || (() => {});
     this.onStats = onStats || (() => {});
+    this.onStatus = onStatus || (() => {});
+    this.onAnswer = onAnswer || (() => {});
+    this.status = "idle";
     this.enabled = false;
     this.transcriptPath = null;
     this.offset = 0;
@@ -71,6 +74,7 @@ class TranscriptReader {
     this.stats = emptyStats();
     this.statsChanged = true;
     this.speakFrom = this.enabled ? this.fileSize() : Infinity;
+    this.setStatus("idle");
   }
 
   poll() {
@@ -127,12 +131,15 @@ class TranscriptReader {
     } catch {
       return;
     }
+    if (entry.type === "user") {
+      if (!entry.isSidechain) this.setStatus("working");
+      return;
+    }
     if (entry.type !== "assistant") return;
 
     const message = entry.message || {};
     this.applyUsage(entry, message);
     if (entry.isSidechain) return;
-    if (!this.enabled || lineEnd <= this.speakFrom) return;
 
     const content = message.content;
     if (!Array.isArray(content)) return;
@@ -142,7 +149,19 @@ class TranscriptReader {
       .map((block) => block.text)
       .join(" ")
       .trim();
-    if (text) this.onReply(text);
+    if (!text) return;
+
+    this.setStatus("idle");
+    this.onAnswer();
+
+    if (!this.enabled || lineEnd <= this.speakFrom) return;
+    this.onReply(text);
+  }
+
+  setStatus(status) {
+    if (this.status === status) return;
+    this.status = status;
+    this.onStatus(status);
   }
 
   applyUsage(entry, message) {

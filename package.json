@@ -5,6 +5,8 @@
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
+    "lint": "eslint .",
+    "format": "prettier --write .",
     "test": "npm run test:js && npm run test:py",
     "test:js": "node --test",
     "test:py": "python3 test/tts_worker_test.py",
@@ -43,8 +45,13 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "electron": "^32.0.0",
-    "electron-builder": "^26.15.3"
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.9.1",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^17.11.0",
+    "prettier": "^3.9.6"
   },
   "dependencies": {
     "@xterm/addon-fit": "^0.10.0",

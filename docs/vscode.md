@@ -5,11 +5,11 @@ the Claude Code terminal below, split by a draggable divider.
 
 ## What runs
 
-| Piece | Where | Notes |
-|---|---|---|
-| code-server | own process per session | VS Code workbench served over HTTP |
-| webview | renderer | points at `http://127.0.0.1:<port>/?folder=<folder>` |
-| pty | main | the same folder as cwd, unchanged from before |
+| Piece       | Where                   | Notes                                                |
+| ----------- | ----------------------- | ---------------------------------------------------- |
+| code-server | own process per session | VS Code workbench served over HTTP                   |
+| webview     | renderer                | points at `http://127.0.0.1:<port>/?folder=<folder>` |
+| pty         | main                    | the same folder as cwd, unchanged from before        |
 
 VS Code's own integrated terminal is for project commands. Claude Code stays in
 the xterm pane, because voice input needs our pty to inject the transcribed line.
@@ -42,7 +42,7 @@ packaging.
 - **Settings**: per project (`user-data/<hash of folder>`), because two
   code-server processes cannot share one user-data dir. Seeded from a template,
   which is itself seeded once from the desktop VS Code `User` directory.
-- Seeding checks for the *files*, not the directory — code-server creates those
+- Seeding checks for the _files_, not the directory — code-server creates those
   directories itself on first launch.
 
 Extensions come from Open VSX. Ones absent there still work (they were copied)

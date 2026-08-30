@@ -10,8 +10,8 @@ const { join } = require("node:path");
 
 const BUNDLED_WHISPER = join(process.resourcesPath || "", "whisper", "whisper-cli");
 
-const WHISPER_BIN = process.env.WHISPER_BIN
-  || (existsSync(BUNDLED_WHISPER) ? BUNDLED_WHISPER : "whisper-cli");
+const WHISPER_BIN =
+  process.env.WHISPER_BIN || (existsSync(BUNDLED_WHISPER) ? BUNDLED_WHISPER : "whisper-cli");
 let whisperModel = process.env.WHISPER_MODEL || "models/ggml-small.bin";
 let kokoroPython = process.env.KOKORO_PYTHON || "python3";
 
@@ -140,14 +140,18 @@ class TtsEngine {
 function run(cmd, args, input) {
   return new Promise((resolve, reject) => {
     const p = spawn(cmd, args);
-    let out = "", err = "";
+    let out = "",
+      err = "";
     p.stdout.on("data", (d) => (out += d.toString()));
     p.stderr.on("data", (d) => (err += d.toString()));
     p.on("error", reject);
     p.on("close", (code) =>
-      code === 0 ? resolve(out) : reject(new Error(`${cmd} exited ${code}: ${err}`))
+      code === 0 ? resolve(out) : reject(new Error(`${cmd} exited ${code}: ${err}`)),
     );
-    if (input !== undefined) { p.stdin.write(input); p.stdin.end(); }
+    if (input !== undefined) {
+      p.stdin.write(input);
+      p.stdin.end();
+    }
   });
 }
 

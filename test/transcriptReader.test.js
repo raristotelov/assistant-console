@@ -6,7 +6,8 @@ const path = require("node:path");
 const { TranscriptReader } = require("../src/transcriptReader");
 
 const entry = (obj) => JSON.stringify(obj) + "\n";
-const assistant = (text) => entry({ type: "assistant", message: { content: [{ type: "text", text }] } });
+const assistant = (text) =>
+  entry({ type: "assistant", message: { content: [{ type: "text", text }] } });
 
 const usageEntry = (usage, extra = {}) =>
   entry({
@@ -30,11 +31,15 @@ function setup() {
   const transcript = path.join(dir, "session.jsonl");
   const spoken = [];
   const statsSeen = [];
+  const statuses = [];
+  const answers = [];
   const reader = new TranscriptReader(pointer, {
     onReply: (text) => spoken.push(text),
     onStats: (stats) => statsSeen.push(stats),
+    onStatus: (status) => statuses.push(status),
+    onAnswer: () => answers.push(true),
   });
-  return { dir, pointer, transcript, spoken, statsSeen, reader };
+  return { dir, pointer, transcript, spoken, statsSeen, statuses, answers, reader };
 }
 
 test("speaks a new assistant message", () => {
@@ -76,9 +81,25 @@ test("ignores user entries, tool calls and subagent messages", () => {
   fs.writeFileSync(transcript, "");
   fs.writeFileSync(pointer, transcript);
   reader.enable();
-  fs.appendFileSync(transcript, entry({ type: "user", message: { content: [{ type: "text", text: "my prompt" }] } }));
-  fs.appendFileSync(transcript, entry({ type: "assistant", message: { content: [{ type: "tool_use", name: "Bash", input: {} }] } }));
-  fs.appendFileSync(transcript, entry({ type: "assistant", isSidechain: true, message: { content: [{ type: "text", text: "subagent chatter" }] } }));
+  fs.appendFileSync(
+    transcript,
+    entry({ type: "user", message: { content: [{ type: "text", text: "my prompt" }] } }),
+  );
+  fs.appendFileSync(
+    transcript,
+    entry({
+      type: "assistant",
+      message: { content: [{ type: "tool_use", name: "Bash", input: {} }] },
+    }),
+  );
+  fs.appendFileSync(
+    transcript,
+    entry({
+      type: "assistant",
+      isSidechain: true,
+      message: { content: [{ type: "text", text: "subagent chatter" }] },
+    }),
+  );
   reader.poll();
   assert.deepEqual(spoken, []);
 });
@@ -92,8 +113,14 @@ test("joins several text blocks of one message", () => {
     transcript,
     entry({
       type: "assistant",
-      message: { content: [{ type: "text", text: "First part." }, { type: "tool_use", name: "Read" }, { type: "text", text: "Second part." }] },
-    })
+      message: {
+        content: [
+          { type: "text", text: "First part." },
+          { type: "tool_use", name: "Read" },
+          { type: "text", text: "Second part." },
+        ],
+      },
+    }),
   );
   reader.poll();
   assert.deepEqual(spoken, ["First part. Second part."]);
@@ -206,4 +233,83 @@ test("resets stats when the session changes", () => {
   reader.poll();
   assert.equal(statsSeen.at(-1).outputTokens, 2);
   assert.equal(statsSeen.at(-1).messages, 1);
+});
+
+const userEntry = (extra = {}) =>
+  entry({ type: "user", ...extra, message: { content: "do the thing" } });
+
+const toolUse = () =>
+  entry({
+    type: "assistant",
+    message: { content: [{ type: "tool_use", id: "t1", name: "Bash", input: {} }] },
+  });
+
+function primed() {
+  const ctx = setup();
+  fs.writeFileSync(ctx.transcript, "");
+  fs.writeFileSync(ctx.pointer, ctx.transcript);
+  ctx.reader.poll();
+  ctx.statuses.length = 0;
+  return ctx;
+}
+
+test("a user entry marks the session working", () => {
+  const { transcript, statuses, reader } = primed();
+  fs.appendFileSync(transcript, userEntry());
+  reader.poll();
+  assert.deepEqual(statuses, ["working"]);
+  assert.equal(reader.status, "working");
+});
+
+test("an assistant reply returns the session to idle and reports an answer", () => {
+  const { transcript, statuses, answers, reader } = primed();
+  fs.appendFileSync(transcript, userEntry() + assistant("Done."));
+  reader.poll();
+  assert.deepEqual(statuses, ["working", "idle"]);
+  assert.deepEqual(answers, [true]);
+});
+
+test("stays working through a tool loop", () => {
+  const { transcript, statuses, reader } = primed();
+  fs.appendFileSync(transcript, userEntry() + toolUse() + userEntry());
+  reader.poll();
+  assert.deepEqual(statuses, ["working"]);
+  assert.equal(reader.status, "working");
+});
+
+test("repeats do not re-emit the same status", () => {
+  const { transcript, statuses, reader } = primed();
+  fs.appendFileSync(transcript, userEntry() + userEntry() + userEntry());
+  reader.poll();
+  assert.deepEqual(statuses, ["working"]);
+});
+
+test("sidechain user entries do not change status", () => {
+  const { transcript, statuses, reader } = primed();
+  fs.appendFileSync(transcript, userEntry({ isSidechain: true }));
+  reader.poll();
+  assert.deepEqual(statuses, []);
+  assert.equal(reader.status, "idle");
+});
+
+test("reports an answer even while reading is disabled", () => {
+  const { transcript, spoken, answers, reader } = primed();
+  fs.appendFileSync(transcript, assistant("Quiet reply."));
+  reader.poll();
+  assert.deepEqual(spoken, []);
+  assert.deepEqual(answers, [true]);
+});
+
+test("switching transcript resets the status to idle", () => {
+  const { dir, pointer, transcript, statuses, reader } = primed();
+  fs.appendFileSync(transcript, userEntry());
+  reader.poll();
+  assert.equal(reader.status, "working");
+
+  const next = path.join(dir, "other.jsonl");
+  fs.writeFileSync(next, "");
+  fs.writeFileSync(pointer, next);
+  reader.poll();
+  assert.equal(reader.status, "idle");
+  assert.deepEqual(statuses, ["working", "idle"]);
 });

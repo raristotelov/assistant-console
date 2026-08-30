@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld("api", {
     create: () => ipcRenderer.invoke("session:create"),
     close: (id) => ipcRenderer.send("session:close", id),
     onStats: (cb) => ipcRenderer.on("session:stats", (_e, payload) => cb(payload)),
+    onStatus: (cb) => ipcRenderer.on("session:status", (_e, payload) => cb(payload)),
+    onAnswer: (cb) => ipcRenderer.on("session:answer", (_e, payload) => cb(payload)),
   },
 
   editor: {

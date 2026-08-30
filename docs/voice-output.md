@@ -39,8 +39,8 @@ if [ -n "$ASSISTANT_CONSOLE_SESSION_FILE" ]; then jq -r .transcript_path > "$ASS
 `toSpeakable()` converts markdown to what should actually be said:
 
 - **Skipped entirely:** fenced code blocks (including unclosed) and tables. If
-  anything was skipped, one sentence is appended: *"There's something in the
-  terminal you need to see."*
+  anything was skipped, one sentence is appended: _"There's something in the
+  terminal you need to see."_
 - **Stripped:** emphasis, inline backticks, heading/list/quote markers, emoji
   (including modifiers and ZWJ sequences), link URLs (link text is kept).
 - **Expanded:** all-caps tokens of 2–5 letters become spaced letters, so `PR`
@@ -54,13 +54,13 @@ and stays alive for the life of the app.
 
 Protocol over stdin/stdout — one JSON header line, then raw bytes:
 
-| Direction | Message |
-|---|---|
-| in | `{"id": n, "text": "..."}` — speak this reply |
-| in | `{"cancel": n}` — stop; ids ≤ n are dropped |
-| out | `{"ready": true}` — model loaded |
-| out | `{"id", "seq", "len", "last"}` + `len` bytes of WAV |
-| out | `{"id", "error"}` |
+| Direction | Message                                             |
+| --------- | --------------------------------------------------- |
+| in        | `{"id": n, "text": "..."}` — speak this reply       |
+| in        | `{"cancel": n}` — stop; ids ≤ n are dropped         |
+| out       | `{"ready": true}` — model loaded                    |
+| out       | `{"id", "seq", "len", "last"}` + `len` bytes of WAV |
+| out       | `{"id", "error"}`                                   |
 
 The worker splits the reply into sentences and emits each as a 24 kHz mono WAV
 as soon as it is ready, checking for cancels between sentences. `TtsEngine`

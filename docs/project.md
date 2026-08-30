@@ -11,14 +11,14 @@ interactive Claude Code session. Type in it, or talk to it and hear replies.
 
 ## Docs
 
-| File | Covers |
-|---|---|
+| File                               | Covers                                                  |
+| ---------------------------------- | ------------------------------------------------------- |
 | [architecture.md](architecture.md) | Layers, data flow, why replies come from the transcript |
-| [terminal.md](terminal.md) | Electron, node-pty, xterm.js, input submission |
-| [voice-input.md](voice-input.md) | VAD → whisper → typed into the terminal |
-| [voice-output.md](voice-output.md) | Transcript → speakable text → Kokoro → playback |
-| [setup.md](setup.md) | Install, `.env`, the SessionStart hook, gotchas |
-| [testing.md](testing.md) | Test suites, coverage, what is out of scope |
+| [terminal.md](terminal.md)         | Electron, node-pty, xterm.js, input submission          |
+| [voice-input.md](voice-input.md)   | VAD → whisper → typed into the terminal                 |
+| [voice-output.md](voice-output.md) | Transcript → speakable text → Kokoro → playback         |
+| [setup.md](setup.md)               | Install, `.env`, the SessionStart hook, gotchas         |
+| [testing.md](testing.md)           | Test suites, coverage, what is out of scope             |
 
 ## Layout
 

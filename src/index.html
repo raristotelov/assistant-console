@@ -1,158 +1,615 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>Assistant Console</title>
-  <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
-  <style>
-    :root {
-      --bg:#24292e; --panel:#2f363d; --panel-2:#1f2428; --border:#1b1f23;
-      --text:#d1d5da; --muted:#959da5; --accent:#005cc5; --on:#34d058; --danger:#f97583;
-      --hover:#282e34; --accent-hover:#0366d6; --selected:#39414a;
-    }
-    * { box-sizing: border-box; }
-    html, body { height:100%; margin:0; background:var(--bg); color:var(--text);
-      font:14px -apple-system, system-ui, sans-serif; overflow:hidden; }
-    body { display:flex; }
+  <head>
+    <meta charset="UTF-8" />
+    <title>Assistant Console</title>
+    <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
+    <style>
+      :root {
+        --bg: #30353c;
+        --panel: #3c424a;
+        --panel-2: #272b31;
+        --border: #4c545e;
+        --text: #e7eaee;
+        --muted: #a4abb4;
+        --accent: #007a6e;
+        --on: #7dc46a;
+        --danger: #f98a90;
+        --hover: #363c43;
+        --accent-hover: #00695e;
+        --selected: #464d56;
+        --accent-pressed: #00594f;
+        --danger-pressed: #c94651;
+        --status-idle: #a4abb4;
+        --status-working: #e8a33d;
+        --status-ready: #7dc46a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      button {
+        font: inherit;
+      }
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font:
+          14px -apple-system,
+          system-ui,
+          sans-serif;
+        overflow: hidden;
+      }
+      body {
+        display: flex;
+      }
 
-    #sidebar { width:240px; flex:none; background:var(--panel-2);
-      border-right:1px solid var(--border); display:flex; flex-direction:column;
-      transition:width .15s ease; }
-    #sidebar.collapsed { width:60px; }
-    .side-head { display:flex; align-items:center; gap:8px; padding:12px 12px;
-      border-bottom:1px solid var(--border); }
-    .brand { font-weight:700; white-space:nowrap; overflow:hidden; }
-    #sidebar.collapsed .brand, #sidebar.collapsed .side-label { display:none; }
-    #collapse { margin-left:auto; background:none; border:1px solid var(--border);
-      color:var(--muted); width:28px; height:28px; border-radius:6px; cursor:pointer;
-      transition:background .12s ease, color .12s ease; }
-    #collapse:hover { background:var(--hover); color:var(--text); }
-    #sidebar.collapsed #collapse { margin:0 auto; }
-    #session-list { flex:1; overflow-y:auto; padding:8px; display:flex;
-      flex-direction:column; gap:4px; }
-    .session-item { display:flex; align-items:center; gap:8px; padding:8px 10px;
-      border-radius:8px; cursor:pointer; color:var(--text); border:1px solid transparent; }
-    .session-item { transition:background .12s ease; }
-    .session-item:hover { background:var(--hover); }
-    .session-item.active { background:var(--panel); border-color:var(--accent); }
-    .dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none; }
-    .session-item.reading .dot { background:var(--on); }
-    .session-item.exited .dot { background:var(--danger); }
-    .session-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    .session-close { background:none; border:none; color:var(--muted); cursor:pointer;
-      font-size:16px; line-height:1; padding:0 2px; transition:color .12s ease; }
-    .session-close:hover { color:var(--danger); }
-    #sidebar.collapsed .session-name, #sidebar.collapsed .session-close { display:none; }
-    #new-session { margin:8px; padding:10px; background:var(--accent); color:#fff;
-      border:none; border-radius:8px; cursor:pointer; font-weight:600;
-      transition:background .12s ease; }
-    #new-session:hover { background:var(--accent-hover); }
+      #sidebar {
+        width: 240px;
+        flex: none;
+        background: var(--panel-2);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        transition: width 0.15s ease;
+      }
+      #sidebar.collapsed {
+        width: 60px;
+      }
+      .side-head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 56px;
+        flex: none;
+        padding: 0 12px 0 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      .brand {
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      #sidebar.collapsed .brand,
+      #sidebar.collapsed .side-label {
+        display: none;
+      }
+      #collapse {
+        flex: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        background: none;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        cursor: pointer;
+        transition:
+          background 0.12s ease,
+          color 0.12s ease;
+      }
+      #collapse:hover {
+        background: var(--hover);
+        color: var(--text);
+      }
+      .glyph-sm {
+        width: 14px;
+        height: 14px;
+      }
+      .glyph-md {
+        width: 26px;
+        height: 26px;
+      }
+      .glyph-lg {
+        width: 30px;
+        height: 30px;
+      }
+      #session-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .session-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        color: var(--text);
+        background: var(--panel);
+        border: 1px solid var(--border);
+      }
+      .session-item {
+        transition: background 0.12s ease;
+      }
+      .session-item:hover {
+        background: var(--hover);
+      }
+      .session-item.active {
+        background: var(--panel);
+        border-color: var(--accent);
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--status-idle);
+        flex: none;
+      }
+      .session-item.working .dot {
+        background: var(--status-working);
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      .session-item.ready .dot {
+        background: var(--status-ready);
+      }
+      .session-item.exited .dot {
+        background: var(--danger);
+      }
+      @keyframes pulse {
+        50% {
+          opacity: 0.3;
+        }
+      }
+      .monogram {
+        display: none;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        line-height: 14px;
+      }
+      #sidebar.collapsed .monogram {
+        display: block;
+        margin-bottom: 2px;
+      }
+      .session-icons {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: none;
+      }
+      .session-icon-slot {
+        display: flex;
+        color: var(--muted);
+        background: none;
+        border: none;
+        padding: 0;
+      }
+      .session-icon-slot.active {
+        color: var(--status-ready);
+      }
+      button.session-icon-slot {
+        cursor: pointer;
+        transition: color 0.12s ease;
+      }
+      button.session-icon-slot:hover {
+        color: var(--text);
+      }
+      button.session-icon-slot.active:hover {
+        color: var(--on);
+      }
+      .session-icon {
+        width: 13px;
+        height: 13px;
+      }
+      #sidebar.collapsed #session-list {
+        align-items: center;
+      }
+      #sidebar.collapsed #new-session {
+        width: 42px;
+        align-self: center;
+      }
+      #sidebar.collapsed .session-item {
+        display: grid;
+        grid-template-columns: 14px 14px;
+        gap: 2px;
+        width: 42px;
+        height: 42px;
+        padding: 5px;
+        place-items: center;
+        background: var(--panel);
+        border-color: var(--border);
+      }
+      #sidebar.collapsed .session-item.active {
+        border-color: var(--accent);
+      }
+      #sidebar.collapsed .session-icons {
+        grid-column: 1 / -1;
+        display: grid;
+        grid-template-columns: 14px 14px;
+        gap: 2px;
+        place-items: center;
+      }
+      .session-name {
+        flex: 1;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .session-close {
+        background: none;
+        border: none;
+        color: var(--muted);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        transition: color 0.12s ease;
+      }
+      .session-close:hover {
+        color: var(--danger);
+      }
+      #sidebar.collapsed .session-name,
+      #sidebar.collapsed .session-close {
+        display: none;
+      }
+      #new-session {
+        margin: 8px;
+        padding: 10px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        transition: background 0.12s ease;
+      }
+      #new-session:hover {
+        background: var(--accent-hover);
+      }
+      #new-session:active {
+        background: var(--accent-pressed);
+      }
 
-    #main { flex:1; display:flex; flex-direction:column; min-width:0; }
-    #toolbar { display:flex; gap:8px; align-items:center; padding:10px 16px;
-      border-bottom:1px solid var(--border); }
-    #toolbar.hidden, #panes.hidden, footer.hidden, #start.hidden { display:none; }
-    #stats { display:flex; gap:18px; align-items:center; margin-left:auto;
-      color:var(--muted); font-size:12px; min-width:0; overflow:hidden; }
-    .stat { white-space:nowrap; }
-    .stat b { color:var(--text); font-weight:600; }
+      #main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+      }
+      #toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        height: 56px;
+        flex: none;
+        padding: 0 16px;
+        border-bottom: 1px solid var(--border);
+      }
+      #toolbar.hidden,
+      #panes.hidden,
+      footer.hidden,
+      #start.hidden {
+        display: none;
+      }
+      #stats {
+        display: flex;
+        gap: 18px;
+        align-items: center;
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 12px;
+        min-width: 0;
+        overflow: hidden;
+      }
+      .stat {
+        white-space: nowrap;
+      }
+      .stat b {
+        color: var(--text);
+        font-weight: 600;
+      }
 
-    #panes { flex:1; position:relative; min-height:0; }
-    .session-pane { position:absolute; inset:0; display:none; flex-direction:column; }
-    .session-pane.active { display:flex; }
+      #panes {
+        flex: 1;
+        position: relative;
+        min-height: 0;
+      }
+      .session-pane {
+        position: absolute;
+        inset: 0;
+        display: none;
+        flex-direction: column;
+      }
+      .session-pane.active {
+        display: flex;
+      }
 
-    .editor-slot { flex:3; min-height:0; margin:8px 8px 0; display:flex; }
-    .term-slot { flex:2; min-height:0; margin:8px; display:flex; }
-    .editor-slot.filled, .term-slot.filled { display:block; }
-    .editor-slot webview { width:100%; height:100%; border:1px solid var(--border);
-      border-radius:8px; background:var(--bg); }
+      .editor-slot {
+        flex: 3;
+        min-height: 0;
+        margin: 8px 8px 0;
+        display: flex;
+      }
+      .term-slot {
+        flex: 2;
+        min-height: 0;
+        margin: 8px;
+        display: flex;
+      }
+      .editor-slot.filled,
+      .term-slot.filled {
+        display: block;
+      }
+      .editor-slot webview {
+        width: 100%;
+        height: 100%;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+      }
 
-    .divider { flex:none; height:10px; margin:0 8px; cursor:row-resize; position:relative; }
-    .divider::after { content:""; position:absolute; left:0; right:0; top:4px; height:2px;
-      background:var(--border); border-radius:1px; }
-    .divider:hover::after, .session-pane.resizing .divider::after { background:var(--accent); }
-    .session-pane.resizing webview { pointer-events:none; }
+      .divider {
+        flex: none;
+        height: 10px;
+        margin: 0 8px;
+        cursor: row-resize;
+        position: relative;
+      }
+      .divider::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 4px;
+        height: 2px;
+        background: var(--border);
+        border-radius: 1px;
+      }
+      .divider:hover::after,
+      .session-pane.resizing .divider::after {
+        background: var(--accent);
+      }
+      .session-pane.resizing webview {
+        pointer-events: none;
+      }
 
-    .slot-add { flex:1; display:flex; flex-direction:column; align-items:center;
-      justify-content:center; gap:12px; border:1px dashed var(--border);
-      border-radius:10px; color:var(--muted); }
-    .slot-add button { width:64px; height:64px; border-radius:50%; border:none;
-      background:var(--accent); color:#fff; font-size:32px; line-height:1; cursor:pointer;
-      transition:background .12s ease, transform .12s ease; }
-    .slot-add:hover { border-color:var(--accent); }
-    .slot-add button:hover:not(:disabled) { background:var(--accent-hover); transform:scale(1.05); }
-    .slot-add button:disabled { opacity:.4; cursor:default; }
+      .slot-add {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        border: 1px dashed var(--border);
+        border-radius: 10px;
+        color: var(--muted);
+      }
+      .slot-add button {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        border: none;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          background 0.12s ease,
+          transform 0.12s ease;
+      }
+      .slot-add:hover {
+        border-color: var(--accent);
+      }
+      .slot-add button:hover:not(:disabled) {
+        background: var(--accent-hover);
+        transform: scale(1.05);
+      }
+      .slot-add button:active:not(:disabled) {
+        background: var(--accent-pressed);
+        transform: scale(0.98);
+      }
+      .slot-add button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
 
-    #start { flex:1; display:flex; flex-direction:column; align-items:center;
-      justify-content:center; gap:16px; }
-    #start p { color:var(--muted); margin:0; }
-    #start-btn { width:72px; height:72px; border-radius:50%; border:none;
-      background:var(--accent); color:#fff; font-size:34px; cursor:pointer;
-      transition:background .12s ease, transform .12s ease; }
-    #start-btn:hover { background:var(--accent-hover); transform:scale(1.05); }
+      #start {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+      }
+      #start p {
+        color: var(--muted);
+        margin: 0;
+      }
+      #start-btn {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        border: none;
+        background: var(--accent);
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          background 0.12s ease,
+          transform 0.12s ease;
+      }
+      #start-btn:hover {
+        background: var(--accent-hover);
+        transform: scale(1.05);
+      }
+      #start-btn:active {
+        background: var(--accent-pressed);
+        transform: scale(0.98);
+      }
 
-    #mic, #read { background:var(--accent); border:1px solid var(--accent); color:#fff;
-      padding:9px 14px; border-radius:999px; cursor:pointer; white-space:nowrap;
-      transition:background .12s ease, border-color .12s ease; }
-    #mic:hover, #read:hover { background:var(--accent-hover); border-color:var(--accent-hover); }
-    #mic.active, #read.active { background:var(--on); color:#24292e; border-color:var(--on); }
-    #mic.active:hover, #read.active:hover { background:var(--on); border-color:var(--text); }
-    #stop-speak { background:transparent; border:1px solid var(--danger); color:var(--danger);
-      padding:9px 14px; border-radius:999px; cursor:pointer; white-space:nowrap;
-      transition:background .12s ease, color .12s ease; }
-    #stop-speak:hover { background:var(--danger); color:#24292e; }
+      #mic,
+      #read {
+        background: var(--accent);
+        border: 1px solid var(--accent);
+        color: #fff;
+        padding: 9px 14px;
+        border-radius: 999px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+          background 0.12s ease,
+          border-color 0.12s ease;
+      }
+      #mic:hover,
+      #read:hover {
+        background: var(--accent-hover);
+        border-color: var(--accent-hover);
+      }
+      #mic:active,
+      #read:active {
+        background: var(--accent-pressed);
+        border-color: var(--accent-pressed);
+      }
+      #mic.active,
+      #read.active {
+        background: var(--on);
+        color: var(--bg);
+        border-color: var(--on);
+      }
+      #mic.active:hover,
+      #read.active:hover {
+        background: var(--on);
+        border-color: var(--text);
+      }
+      #stop-speak {
+        background: transparent;
+        border: 1px solid var(--danger);
+        color: var(--danger);
+        padding: 9px 14px;
+        border-radius: 999px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+          background 0.12s ease,
+          color 0.12s ease;
+      }
+      #stop-speak:hover {
+        background: var(--danger);
+        color: var(--bg);
+      }
+      #stop-speak:active {
+        background: var(--danger-pressed);
+        border-color: var(--danger-pressed);
+        color: #fff;
+      }
 
-    footer { display:flex; gap:12px; align-items:center; padding:8px 16px;
-      border-top:1px solid var(--border); }
-    #heard { flex:1; min-width:0; color:var(--muted);
-      white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    #heard.filled { color:var(--text); }
-    #status { color:var(--muted); font-size:12px; }
-  </style>
-</head>
-<body>
-  <aside id="sidebar">
-    <div class="side-head">
-      <div class="brand">Assistant&nbsp;Console</div>
-      <button id="collapse" title="Collapse sidebar">«</button>
-    </div>
-    <div id="session-list"></div>
-    <button id="new-session" title="New session">+<span class="side-label">&nbsp;New session</span></button>
-  </aside>
-
-  <div id="main">
-    <header id="toolbar" class="hidden">
-      <button id="mic">Start listening</button>
-      <button id="read">Start reading</button>
-      <div id="stats">
-        <div class="stat">Context <b id="stat-context">—</b></div>
-        <div class="stat">In <b id="stat-in">—</b></div>
-        <div class="stat">Out <b id="stat-out">—</b></div>
-        <div class="stat">Cache read <b id="stat-cache-read">—</b></div>
-        <div class="stat">Cache write <b id="stat-cache-write">—</b></div>
-        <div class="stat">Messages <b id="stat-messages">—</b></div>
-        <div class="stat" id="stat-model">—</div>
+      footer {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        padding: 8px 16px;
+        border-top: 1px solid var(--border);
+      }
+      #heard {
+        flex: 1;
+        min-width: 0;
+        color: var(--muted);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      #heard.filled {
+        color: var(--text);
+      }
+      #status {
+        color: var(--muted);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <aside id="sidebar" class="collapsed">
+      <div class="side-head">
+        <button id="collapse" title="Toggle sidebar">
+          <svg class="glyph-sm" viewBox="0 0 24 24" fill="none">
+            <path
+              id="collapse-path"
+              d="M13 6l6 6-6 6M6 6l6 6-6 6"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        <div class="brand">Assistant&nbsp;Console</div>
       </div>
-      <button id="stop-speak">Stop speaking</button>
-    </header>
+      <div id="session-list"></div>
+      <button id="new-session" title="New session">
+        <svg class="glyph-sm" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M12 5v14M5 12h14"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+        <span class="side-label">New session</span>
+      </button>
+    </aside>
 
-    <div id="start">
-      <button id="start-btn" title="New session">+</button>
-      <p>Pick a project folder to start a session</p>
+    <div id="main">
+      <header id="toolbar" class="hidden">
+        <button id="mic">Start listening</button>
+        <button id="read">Start reading</button>
+        <div id="stats">
+          <div class="stat">Context <b id="stat-context">—</b></div>
+          <div class="stat">In <b id="stat-in">—</b></div>
+          <div class="stat">Out <b id="stat-out">—</b></div>
+          <div class="stat">Cache read <b id="stat-cache-read">—</b></div>
+          <div class="stat">Cache write <b id="stat-cache-write">—</b></div>
+          <div class="stat">Messages <b id="stat-messages">—</b></div>
+          <div class="stat" id="stat-model">—</div>
+        </div>
+        <button id="stop-speak">Stop speaking</button>
+      </header>
+
+      <div id="start">
+        <button id="start-btn" title="New session">
+          <svg class="glyph-lg" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 5v14M5 12h14"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+        <p>Pick a project folder to start a session</p>
+      </div>
+
+      <div id="panes" class="hidden"></div>
+
+      <footer class="hidden">
+        <div id="heard"></div>
+        <div id="status">terminal</div>
+      </footer>
     </div>
 
-    <div id="panes" class="hidden"></div>
-
-    <footer class="hidden">
-      <div id="heard"></div>
-      <div id="status">terminal</div>
-    </footer>
-  </div>
-
-  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
-  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.19/dist/bundle.min.js"></script>
-  <script src="renderer.js"></script>
-</body>
+    <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+    <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.14.0/dist/ort.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@ricky0123/vad-web@0.0.19/dist/bundle.min.js"></script>
+    <script src="sessionView.js"></script>
+    <script src="renderer.js"></script>
+  </body>
 </html>

@@ -151,8 +151,11 @@ class TranscriptReader {
       .trim();
     if (!text) return;
 
-    this.setStatus("idle");
-    this.onAnswer();
+    const narratingBeforeToolCall = message.stop_reason === "tool_use";
+    if (!narratingBeforeToolCall) {
+      this.setStatus("idle");
+      this.onAnswer();
+    }
 
     if (!this.enabled || lineEnd <= this.speakFrom) return;
     this.onReply(text);

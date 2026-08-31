@@ -241,7 +241,16 @@ const userEntry = (extra = {}) =>
 const toolUse = () =>
   entry({
     type: "assistant",
-    message: { content: [{ type: "tool_use", id: "t1", name: "Bash", input: {} }] },
+    message: {
+      stop_reason: "tool_use",
+      content: [{ type: "tool_use", id: "t1", name: "Bash", input: {} }],
+    },
+  });
+
+const narration = (text) =>
+  entry({
+    type: "assistant",
+    message: { stop_reason: "tool_use", content: [{ type: "text", text }] },
   });
 
 function primed() {
@@ -275,6 +284,23 @@ test("stays working through a tool loop", () => {
   reader.poll();
   assert.deepEqual(statuses, ["working"]);
   assert.equal(reader.status, "working");
+});
+
+test("narration before a tool call leaves the session working and reports no answer", () => {
+  const { transcript, statuses, answers, reader } = primed();
+  fs.appendFileSync(transcript, userEntry() + narration("Let me check that file.") + toolUse());
+  reader.poll();
+  assert.deepEqual(statuses, ["working"]);
+  assert.equal(reader.status, "working");
+  assert.deepEqual(answers, []);
+});
+
+test("narration before a tool call is still spoken", () => {
+  const { transcript, spoken, reader } = primed();
+  reader.enable();
+  fs.appendFileSync(transcript, narration("Let me check that file."));
+  reader.poll();
+  assert.deepEqual(spoken, ["Let me check that file."]);
 });
 
 test("repeats do not re-emit the same status", () => {

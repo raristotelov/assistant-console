@@ -13,6 +13,10 @@ const statusEl = document.getElementById("status");
 const readBtn = document.getElementById("read");
 const micBtn = document.getElementById("mic");
 const heardEl = document.getElementById("heard");
+const closeEditorBtn = document.getElementById("close-editor");
+const closeTermBtn = document.getElementById("close-term");
+const changeFolderBtn = document.getElementById("change-folder");
+const changeFolderTip = document.getElementById("change-folder-tip");
 
 const sessions = new Map();
 let activeId = null;
@@ -137,6 +141,8 @@ async function addTerminal(session) {
 
   session.term = term;
   session.fit = fit;
+  if (session.reading) window.api.voice.setReading(session.id, true);
+  syncChrome();
   fitActive();
   term.focus();
 }
@@ -153,12 +159,59 @@ async function addEditor(session) {
     session.editorSlot.classList.add("filled");
     session.editorSlot.appendChild(view);
     session.editorUrl = url;
+    syncChrome();
     fitActive();
   } catch (e) {
     session.editorAdd.button.disabled = false;
     session.editorAdd.caption.textContent = "VS Code";
     setStatus(`code-server failed: ${e.message || e}`);
   }
+}
+
+function resetSlot(slot, add, label) {
+  slot.textContent = "";
+  slot.classList.remove("filled");
+  add.button.disabled = false;
+  add.caption.textContent = label;
+  slot.appendChild(add.wrap);
+}
+
+async function closeEditorPane(session) {
+  if (!session.editorUrl) return;
+  await window.api.editor.close(session.id);
+  session.editorUrl = null;
+  resetSlot(session.editorSlot, session.editorAdd, "VS Code");
+  syncChrome();
+  fitActive();
+}
+
+async function closeTerminalPane(session) {
+  if (!session.term) return;
+  await window.api.term.close(session.id);
+  session.term.dispose();
+  Object.assign(session, {
+    term: null,
+    fit: null,
+    exited: false,
+    stats: null,
+    status: "idle",
+    unread: false,
+  });
+  resetSlot(session.termSlot, session.termAdd, "Terminal for Claude Code");
+  renderSidebar();
+  syncChrome();
+}
+
+async function changeFolder() {
+  const session = sessions.get(activeId);
+  if (!canChangeFolder(session)) return;
+
+  const changed = await window.api.sessions.setFolder(session.id);
+  if (!changed) return;
+
+  session.folder = changed.folder;
+  renderSidebar();
+  syncChrome();
 }
 
 function closeSession(id) {
@@ -311,6 +364,16 @@ function syncChrome() {
   const session = sessions.get(activeId);
   readBtn.textContent = session?.reading ? "Stop reading" : "Start reading";
   readBtn.classList.toggle("active", !!session?.reading);
+
+  closeEditorBtn.disabled = !session?.editorUrl;
+  closeTermBtn.disabled = !session?.term;
+
+  const folderChangeable = canChangeFolder(session);
+  changeFolderBtn.disabled = !folderChangeable;
+  changeFolderTip.title = folderChangeable
+    ? "Change this session's folder"
+    : "Close VS Code and the terminal first — the folder can only change while both panes are closed";
+
   renderStats(session?.stats);
 }
 
@@ -377,6 +440,16 @@ window.api.sessions.onAnswer(({ id }) => {
   if (id !== activeId) session.unread = true;
   renderSidebar();
 });
+
+closeEditorBtn.addEventListener("click", () => {
+  const session = sessions.get(activeId);
+  if (session) closeEditorPane(session);
+});
+closeTermBtn.addEventListener("click", () => {
+  const session = sessions.get(activeId);
+  if (session) closeTerminalPane(session);
+});
+changeFolderBtn.addEventListener("click", changeFolder);
 
 document.getElementById("new-session").addEventListener("click", createSession);
 document.getElementById("start-btn").addEventListener("click", createSession);

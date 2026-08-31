@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("api", {
   sessions: {
     create: () => ipcRenderer.invoke("session:create"),
+    setFolder: (id) => ipcRenderer.invoke("session:set-folder", id),
     close: (id) => ipcRenderer.send("session:close", id),
     onStats: (cb) => ipcRenderer.on("session:stats", (_e, payload) => cb(payload)),
     onStatus: (cb) => ipcRenderer.on("session:status", (_e, payload) => cb(payload)),
@@ -12,10 +13,12 @@ contextBridge.exposeInMainWorld("api", {
 
   editor: {
     open: (id) => ipcRenderer.invoke("editor:open", id),
+    close: (id) => ipcRenderer.invoke("editor:close", id),
   },
 
   term: {
     open: (id) => ipcRenderer.invoke("term:open", id),
+    close: (id) => ipcRenderer.invoke("term:close", id),
     input: (id, data) => ipcRenderer.send("term:input", { id, data }),
     resize: (id, cols, rows) => ipcRenderer.send("term:resize", { id, cols, rows }),
     sendLine: (id, text) => ipcRenderer.send("term:send-line", { id, text }),

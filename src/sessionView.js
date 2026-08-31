@@ -41,6 +41,10 @@
     return session.reading ? "idle" : "off";
   }
 
+  function canChangeFolder(session) {
+    return !!session && !session.term && !session.editorUrl;
+  }
+
   return {
     formatTokens,
     sessionName,
@@ -48,5 +52,6 @@
     sessionStatus,
     micState,
     speakerState,
+    canChangeFolder,
   };
 });

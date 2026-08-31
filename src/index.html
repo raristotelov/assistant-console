@@ -490,6 +490,39 @@
         background: var(--on);
         border-color: var(--text);
       }
+      .toolbar-tip {
+        display: flex;
+      }
+      .toolbar-btn {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 9px 12px;
+        font-size: 12px;
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        border-radius: 999px;
+        cursor: pointer;
+        white-space: nowrap;
+        transition:
+          background 0.12s ease,
+          border-color 0.12s ease,
+          color 0.12s ease;
+      }
+      .toolbar-btn:hover:not(:disabled) {
+        background: var(--hover);
+        border-color: var(--text);
+        color: var(--text);
+      }
+      .toolbar-btn:active:not(:disabled) {
+        background: var(--selected);
+      }
+      .toolbar-btn:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+
       #stop-speak {
         background: transparent;
         border: 1px solid var(--danger);
@@ -571,6 +604,42 @@
       <header id="toolbar" class="hidden">
         <button id="mic">Start listening</button>
         <button id="read">Start reading</button>
+        <button id="close-editor" class="toolbar-btn" title="Close VS Code">
+          <svg class="glyph-sm" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+          <span>VS Code</span>
+        </button>
+        <button id="close-term" class="toolbar-btn" title="Close the terminal">
+          <svg class="glyph-sm" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M6 6l12 12M18 6L6 18"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+          <span>Terminal</span>
+        </button>
+        <span id="change-folder-tip" class="toolbar-tip">
+          <button id="change-folder" class="toolbar-btn">
+            <svg class="glyph-sm" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span>Change folder</span>
+          </button>
+        </span>
         <div id="stats">
           <div class="stat">Context <b id="stat-context">—</b></div>
           <div class="stat">In <b id="stat-in">—</b></div>

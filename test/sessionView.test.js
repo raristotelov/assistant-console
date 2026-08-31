@@ -7,6 +7,7 @@ const {
   sessionStatus,
   micState,
   speakerState,
+  canChangeFolder,
 } = require("../src/sessionView");
 
 const session = (extra = {}) => ({
@@ -17,6 +18,8 @@ const session = (extra = {}) => ({
   status: "idle",
   reading: false,
   speaking: false,
+  term: null,
+  editorUrl: null,
   ...extra,
 });
 
@@ -55,6 +58,20 @@ test("speaker is green while talking, idle when reading is on, otherwise off", (
   assert.equal(speakerState(session({ reading: true })), "idle");
   assert.equal(speakerState(session({ reading: true, speaking: true })), "active");
   assert.equal(speakerState(session({ speaking: true })), "active");
+});
+
+test("the folder can only change while both panes are closed", () => {
+  assert.equal(canChangeFolder(session()), true);
+  assert.equal(canChangeFolder(session({ term: {} })), false);
+  assert.equal(canChangeFolder(session({ editorUrl: "http://127.0.0.1:8080/" })), false);
+  assert.equal(canChangeFolder(session({ term: {}, editorUrl: "http://127.0.0.1:8080/" })), false);
+  assert.equal(canChangeFolder(undefined), false);
+});
+
+test("name and monogram follow a changed folder", () => {
+  const changed = session({ folder: "/Users/me/projects/lovb-payload" });
+  assert.equal(sessionName(changed), "lovb-payload");
+  assert.equal(sessionMonogram(changed), "l");
 });
 
 test("formats token counts", () => {

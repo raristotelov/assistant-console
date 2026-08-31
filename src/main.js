@@ -50,18 +50,42 @@ function send(channel, payload) {
   win.webContents.send(channel, payload);
 }
 
-async function createSession() {
+async function pickFolder(title, buttonLabel) {
   const picked = await dialog.showOpenDialog(win, {
-    title: "Choose a project folder",
-    buttonLabel: "Open session",
+    title,
+    buttonLabel,
     properties: ["openDirectory", "createDirectory"],
   });
   if (picked.canceled || !picked.filePaths.length) return null;
+  return picked.filePaths[0];
+}
+
+async function createSession() {
+  const folder = await pickFolder("Choose a project folder", "Open session");
+  if (!folder) return null;
 
   const id = ++nextSessionId;
-  const folder = picked.filePaths[0];
-  sessions.set(id, { id, folder, term: null, reader: null, pointerFile: null, editor: null });
+  sessions.set(id, {
+    id,
+    folder,
+    term: null,
+    reader: null,
+    pointerFile: null,
+    editor: null,
+    termSeq: 0,
+  });
   return { id, folder };
+}
+
+async function setSessionFolder(id) {
+  const session = sessions.get(id);
+  if (!session || session.term || session.editor) return null;
+
+  const folder = await pickFolder("Change session folder", "Use folder");
+  if (!folder) return null;
+
+  session.folder = folder;
+  return { folder };
 }
 
 let voiceReady = null;
@@ -104,7 +128,10 @@ function openTerminal(id) {
   const session = sessions.get(id);
   if (!session || session.term) return;
 
-  const pointerFile = path.join(os.tmpdir(), `assistant-console-session-${process.pid}-${id}`);
+  const pointerFile = path.join(
+    os.tmpdir(),
+    `assistant-console-session-${process.pid}-${id}-${++session.termSeq}`,
+  );
   const shell = os.platform() === "win32" ? "powershell.exe" : process.env.SHELL || "/bin/zsh";
 
   const term = pty.spawn(shell, [], {
@@ -118,8 +145,9 @@ function openTerminal(id) {
     }),
   });
 
-  term.onData((data) => send("term:data", { id, data }));
-  term.onExit(() => send("term:exit", { id }));
+  const current = () => sessions.get(id)?.term === term;
+  term.onData((data) => current() && send("term:data", { id, data }));
+  term.onExit(() => current() && send("term:exit", { id }));
 
   const reader = new TranscriptReader(pointerFile, {
     onReply: (text) => {
@@ -142,24 +170,26 @@ async function openEditor(id) {
   if (!session) return null;
   if (session.editor) return { url: session.editor.url };
 
+  const folder = session.folder;
   const rootDir = path.join(app.getPath("userData"), "code-server");
-  const folderKey = crypto.createHash("sha1").update(session.folder).digest("hex").slice(0, 12);
+  const folderKey = crypto.createHash("sha1").update(folder).digest("hex").slice(0, 12);
 
-  session.editor = await codeServer.start({
+  const editor = await codeServer.start({
     rootDir,
-    folder: session.folder,
+    folder,
     userDataDir: path.join(rootDir, "user-data", folderKey),
     extensionsDir: path.join(rootDir, "extensions"),
     templateDir: path.join(rootDir, "user-data-template"),
   });
+  session.editor = editor;
 
-  codeServer.findIdePort(session.folder).then((port) => {
-    if (!port || sessions.get(id) !== session) return;
+  codeServer.findIdePort(folder).then((port) => {
+    if (!port || sessions.get(id) !== session || session.editor !== editor) return;
     session.idePort = port;
     exportIdePort(session, port);
   });
 
-  return { url: session.editor.url };
+  return { url: editor.url };
 }
 
 function exportIdePort(session, port) {
@@ -168,17 +198,33 @@ function exportIdePort(session, port) {
   session.term.write(`export CLAUDE_CODE_SSE_PORT=${port}\r`);
 }
 
-function closeSession(id) {
+function closeTerminal(id) {
   const session = sessions.get(id);
-  if (!session) return;
-  session.reader?.stop();
-  session.term?.kill();
-  session.editor?.proc.kill();
-  if (session.pointerFile) {
-    try {
-      fs.unlinkSync(session.pointerFile);
-    } catch {}
-  }
+  if (!session?.term) return;
+
+  const { term, reader, pointerFile } = session;
+  Object.assign(session, { term: null, reader: null, pointerFile: null });
+
+  reader?.stop();
+  term.kill();
+  try {
+    fs.unlinkSync(pointerFile);
+  } catch {}
+}
+
+function closeEditor(id) {
+  const session = sessions.get(id);
+  if (!session?.editor) return;
+
+  const { editor } = session;
+  Object.assign(session, { editor: null, idePort: null });
+  editor.proc.kill();
+}
+
+function closeSession(id) {
+  if (!sessions.has(id)) return;
+  closeTerminal(id);
+  closeEditor(id);
   sessions.delete(id);
 }
 
@@ -200,10 +246,13 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("session:create", () => createSession());
+  ipcMain.handle("session:set-folder", (_e, id) => setSessionFolder(id));
   ipcMain.on("session:close", (_e, id) => closeSession(id));
 
   ipcMain.handle("term:open", (_e, id) => openTerminal(id));
+  ipcMain.handle("term:close", (_e, id) => closeTerminal(id));
   ipcMain.handle("editor:open", (_e, id) => openEditor(id));
+  ipcMain.handle("editor:close", (_e, id) => closeEditor(id));
 
   ipcMain.on("term:input", (_e, { id, data }) => sessions.get(id)?.term?.write(data));
   ipcMain.on("term:resize", (_e, { id, cols, rows }) => sessions.get(id)?.term?.resize(cols, rows));

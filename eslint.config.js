@@ -33,6 +33,7 @@ module.exports = [
         sessionStatus: "readonly",
         micState: "readonly",
         speakerState: "readonly",
+        canChangeFolder: "readonly",
       },
     },
   },

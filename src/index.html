@@ -130,9 +130,23 @@
       }
       .session-item {
         transition: background 0.12s ease;
+        user-select: none;
       }
       .session-item:hover {
         background: var(--hover);
+      }
+      #session-list.reordering .session-item {
+        transition:
+          background 0.12s ease,
+          transform 0.12s ease;
+      }
+      #session-list.reordering .session-item.dragging {
+        transition: none;
+        position: relative;
+        z-index: 2;
+        cursor: grabbing;
+        border-color: var(--accent);
+        box-shadow: 0 6px 16px rgb(0 0 0 / 0.35);
       }
       .session-item.active {
         background: var(--panel);

@@ -19,7 +19,14 @@ const changeFolderBtn = document.getElementById("change-folder");
 const changeFolderTip = document.getElementById("change-folder-tip");
 
 const sessions = new Map();
+const sessionOrder = [];
 let activeId = null;
+
+const DRAG_THRESHOLD_PX = 4;
+const DRAG_EDGE_PX = 36;
+const DRAG_SCROLL_PX = 10;
+let justDragged = false;
+let rowDragActive = false;
 
 function setStatus(s) {
   statusEl.textContent = s;
@@ -69,6 +76,7 @@ async function createSession() {
     speaking: false,
   };
   sessions.set(id, session);
+  sessionOrder.push(id);
   pane.insertBefore(makeDivider(session), termSlot);
 
   editorAdd.button.addEventListener("click", () => addEditor(session));
@@ -222,11 +230,12 @@ function closeSession(id) {
   session.term?.dispose();
   session.pane.remove();
   sessions.delete(id);
+  const at = sessionOrder.indexOf(id);
+  if (at >= 0) sessionOrder.splice(at, 1);
 
   if (activeId === id) {
     activeId = null;
-    const next = sessions.keys().next();
-    if (!next.done) activate(next.value);
+    if (sessionOrder.length) activate(sessionOrder[0]);
   }
   renderSidebar();
   syncChrome();
@@ -309,14 +318,106 @@ function toggleReading(session) {
   renderSidebar();
 }
 
+function rowStep(rows) {
+  if (rows.length > 1) return rows[1].offsetTop - rows[0].offsetTop;
+  return rows[0] ? rows[0].offsetHeight : 0;
+}
+
+function beginRowDrag(item, event) {
+  const rows = [...sessionListEl.children];
+  const from = rows.indexOf(item);
+  const step = rowStep(rows);
+  if (from < 0 || !step) return;
+
+  const startY = event.clientY;
+  const startScroll = sessionListEl.scrollTop;
+  let pointerY = startY;
+  let target = from;
+  let dragging = false;
+  let frame = null;
+
+  const place = () => {
+    const dy = pointerY - startY + (sessionListEl.scrollTop - startScroll);
+    target = Math.max(0, Math.min(rows.length - 1, from + Math.round(dy / step)));
+    item.style.transform = `translateY(${dy}px)`;
+    for (const [i, row] of rows.entries()) {
+      if (row === item) continue;
+      let shift = 0;
+      if (target > from && i > from && i <= target) shift = -step;
+      if (target < from && i >= target && i < from) shift = step;
+      row.style.transform = shift ? `translateY(${shift}px)` : "";
+    }
+  };
+
+  const autoscroll = () => {
+    const rect = sessionListEl.getBoundingClientRect();
+    let delta = 0;
+    if (pointerY < rect.top + DRAG_EDGE_PX) delta = -DRAG_SCROLL_PX;
+    else if (pointerY > rect.bottom - DRAG_EDGE_PX) delta = DRAG_SCROLL_PX;
+    if (delta) {
+      const before = sessionListEl.scrollTop;
+      sessionListEl.scrollTop += delta;
+      if (sessionListEl.scrollTop !== before) place();
+    }
+    frame = requestAnimationFrame(autoscroll);
+  };
+
+  const onMove = (e) => {
+    pointerY = e.clientY;
+    if (!dragging) {
+      if (Math.abs(pointerY - startY) < DRAG_THRESHOLD_PX) return;
+      dragging = true;
+      rowDragActive = true;
+      item.classList.add("dragging");
+      sessionListEl.classList.add("reordering");
+      frame = requestAnimationFrame(autoscroll);
+    }
+    place();
+  };
+
+  const finish = (e) => {
+    item.releasePointerCapture(e.pointerId);
+    item.removeEventListener("pointermove", onMove);
+    if (frame) cancelAnimationFrame(frame);
+    if (!dragging) return;
+
+    justDragged = true;
+    setTimeout(() => {
+      justDragged = false;
+    }, 0);
+
+    const reordered = moveSession(sessionOrder, from, target > from ? target + 1 : target);
+    sessionOrder.splice(0, sessionOrder.length, ...reordered);
+    sessionListEl.classList.remove("reordering");
+    rowDragActive = false;
+    renderSidebar();
+  };
+
+  item.setPointerCapture(event.pointerId);
+  item.addEventListener("pointermove", onMove);
+  item.addEventListener("pointerup", finish, { once: true });
+  item.addEventListener("pointercancel", finish, { once: true });
+}
+
 function renderSidebar() {
+  if (rowDragActive) return;
   sessionListEl.textContent = "";
-  for (const session of sessions.values()) {
+  for (const id of sessionOrder) {
+    const session = sessions.get(id);
+    if (!session) continue;
+
     const item = document.createElement("div");
     item.className = `session-item ${sessionStatus(session)}`;
     item.classList.toggle("active", session.id === activeId);
     item.title = session.folder;
-    item.addEventListener("click", () => activate(session.id));
+    item.addEventListener("click", () => {
+      if (justDragged) return;
+      activate(session.id);
+    });
+    item.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0 || e.target.closest("button")) return;
+      beginRowDrag(item, e);
+    });
 
     const dot = document.createElement("span");
     dot.className = "dot";

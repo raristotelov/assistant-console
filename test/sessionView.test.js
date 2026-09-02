@@ -8,6 +8,7 @@ const {
   micState,
   speakerState,
   canChangeFolder,
+  moveSession,
 } = require("../src/sessionView");
 
 const session = (extra = {}) => ({
@@ -72,6 +73,35 @@ test("name and monogram follow a changed folder", () => {
   const changed = session({ folder: "/Users/me/projects/lovb-payload" });
   assert.equal(sessionName(changed), "lovb-payload");
   assert.equal(sessionMonogram(changed), "l");
+});
+
+test("moves a session down the list", () => {
+  assert.deepEqual(moveSession([1, 2, 3, 4], 0, 3), [2, 3, 1, 4]);
+  assert.deepEqual(moveSession([1, 2, 3, 4], 1, 4), [1, 3, 4, 2]);
+});
+
+test("moves a session up the list", () => {
+  assert.deepEqual(moveSession([1, 2, 3, 4], 3, 1), [1, 4, 2, 3]);
+  assert.deepEqual(moveSession([1, 2, 3, 4], 2, 0), [3, 1, 2, 4]);
+});
+
+test("moves a session to either end", () => {
+  assert.deepEqual(moveSession([1, 2, 3], 2, 0), [3, 1, 2]);
+  assert.deepEqual(moveSession([1, 2, 3], 0, 3), [2, 3, 1]);
+});
+
+test("a drop back where it started changes nothing", () => {
+  const order = [1, 2, 3];
+  assert.equal(moveSession(order, 1, 1), order);
+  assert.equal(moveSession(order, 1, 2), order);
+  assert.equal(moveSession(order, 0, 0), order);
+});
+
+test("an out-of-range drop is clamped, and an unknown row is left alone", () => {
+  assert.deepEqual(moveSession([1, 2, 3], 0, 99), [2, 3, 1]);
+  assert.deepEqual(moveSession([1, 2, 3], 2, -5), [3, 1, 2]);
+  const order = [1, 2, 3];
+  assert.equal(moveSession(order, 7, 0), order);
 });
 
 test("formats token counts", () => {

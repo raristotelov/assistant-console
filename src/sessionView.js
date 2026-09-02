@@ -45,6 +45,17 @@
     return !!session && !session.term && !session.editorUrl;
   }
 
+  function moveSession(order, from, insertBefore) {
+    if (from < 0 || from >= order.length) return order;
+    const target = Math.max(0, Math.min(insertBefore, order.length));
+    if (target === from || target === from + 1) return order;
+
+    const next = [...order];
+    next.splice(from, 1);
+    next.splice(target > from ? target - 1 : target, 0, order[from]);
+    return next;
+  }
+
   return {
     formatTokens,
     sessionName,
@@ -53,5 +64,6 @@
     micState,
     speakerState,
     canChangeFolder,
+    moveSession,
   };
 });

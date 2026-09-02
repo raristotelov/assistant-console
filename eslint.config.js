@@ -34,6 +34,7 @@ module.exports = [
         micState: "readonly",
         speakerState: "readonly",
         canChangeFolder: "readonly",
+        moveSession: "readonly",
       },
     },
   },

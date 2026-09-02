@@ -14,6 +14,11 @@ const emptyStats = () => ({
   cacheCreationTokens: 0,
 });
 
+function isLocalCommandOutput(entry) {
+  const content = entry.message?.content;
+  return typeof content === "string" && content.includes("<local-command-stdout>");
+}
+
 class TranscriptReader {
   constructor(pointerFile, { onReply, onStats, onStatus, onAnswer } = {}) {
     this.pointerFile = pointerFile;
@@ -132,7 +137,13 @@ class TranscriptReader {
       return;
     }
     if (entry.type === "user") {
-      if (!entry.isSidechain) this.setStatus("working");
+      if (entry.isSidechain) return;
+      if (isLocalCommandOutput(entry)) {
+        this.setStatus("idle");
+        this.onAnswer();
+        return;
+      }
+      this.setStatus("working");
       return;
     }
     if (entry.type !== "assistant") return;

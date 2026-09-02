@@ -42,6 +42,61 @@ function setup() {
   return { dir, pointer, transcript, spoken, statsSeen, statuses, answers, reader };
 }
 
+const command = (name) =>
+  entry({
+    type: "user",
+    message: { role: "user", content: `<command-name>/${name}</command-name>` },
+  });
+const commandOutput = (text) =>
+  entry({
+    type: "user",
+    message: { role: "user", content: `<local-command-stdout>${text}</local-command-stdout>` },
+  });
+const prompt = (text) => entry({ type: "user", message: { role: "user", content: text } });
+
+test("a local command's output ends the working state and counts as an answer", () => {
+  const { pointer, transcript, statuses, answers, reader } = setup();
+  fs.writeFileSync(transcript, "");
+  fs.writeFileSync(pointer, transcript);
+  reader.poll();
+
+  fs.appendFileSync(transcript, command("ide"));
+  reader.poll();
+  assert.deepEqual(statuses, ["working"]);
+
+  fs.appendFileSync(transcript, commandOutput("Connected to code-server."));
+  reader.poll();
+  assert.deepEqual(statuses, ["working", "idle"]);
+  assert.equal(answers.length, 1);
+});
+
+test("a command that calls the model still works until it replies", () => {
+  const { pointer, transcript, statuses, reader } = setup();
+  fs.writeFileSync(transcript, "");
+  fs.writeFileSync(pointer, transcript);
+  reader.poll();
+
+  fs.appendFileSync(transcript, command("security-review"));
+  reader.poll();
+  assert.deepEqual(statuses, ["working"]);
+
+  fs.appendFileSync(transcript, assistant("Reviewed, nothing to flag."));
+  reader.poll();
+  assert.deepEqual(statuses, ["working", "idle"]);
+});
+
+test("an ordinary prompt is unaffected", () => {
+  const { pointer, transcript, statuses, answers, reader } = setup();
+  fs.writeFileSync(transcript, "");
+  fs.writeFileSync(pointer, transcript);
+  reader.poll();
+
+  fs.appendFileSync(transcript, prompt("what does this do?"));
+  reader.poll();
+  assert.deepEqual(statuses, ["working"]);
+  assert.equal(answers.length, 0);
+});
+
 test("speaks a new assistant message", () => {
   const { pointer, transcript, spoken, reader } = setup();
   fs.writeFileSync(transcript, "");

@@ -184,6 +184,22 @@
       #sidebar.collapsed .monogram {
         display: block;
         margin-bottom: 2px;
+        font-size: 11px;
+        letter-spacing: -0.2px;
+      }
+      .session-flyout {
+        position: fixed;
+        z-index: 10;
+        transform: translateY(-50%);
+        pointer-events: none;
+        padding: 4px 8px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        font-size: 12px;
+        white-space: nowrap;
+        box-shadow: 0 4px 12px rgb(0 0 0 / 0.35);
       }
       .session-icons {
         display: flex;
@@ -224,7 +240,7 @@
       }
       #sidebar.collapsed .session-item {
         display: grid;
-        grid-template-columns: 14px 14px;
+        grid-template-columns: 14px 1fr;
         gap: 2px;
         width: 42px;
         height: 42px;

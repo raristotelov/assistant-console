@@ -18,10 +18,17 @@
   }
 
   function sessionMonogram(session) {
-    const letter = sessionName(session)
-      .replace(/[^a-z0-9]/gi, "")
-      .charAt(0);
-    return letter ? letter.toLowerCase() : "•";
+    const parts = sessionName(session)
+      .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+      .split(/[^a-z0-9]+/i)
+      .filter(Boolean);
+
+    const initials = parts
+      .slice(0, 2)
+      .map((part) => part.charAt(0))
+      .join("");
+    const letters = initials.length > 1 ? initials : (parts[0] || "").slice(0, 2);
+    return letters ? letters.toLowerCase() : "•";
   }
 
   function sessionStatus(session) {

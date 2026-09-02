@@ -318,6 +318,26 @@ function toggleReading(session) {
   renderSidebar();
 }
 
+const flyoutEl = document.createElement("div");
+flyoutEl.className = "session-flyout";
+flyoutEl.hidden = true;
+document.body.appendChild(flyoutEl);
+
+function showFlyout(item, text) {
+  if (rowDragActive || !sidebarEl.classList.contains("collapsed")) return;
+  const rect = item.getBoundingClientRect();
+  flyoutEl.textContent = text;
+  flyoutEl.style.top = `${rect.top + rect.height / 2}px`;
+  flyoutEl.style.left = `${rect.right + 8}px`;
+  flyoutEl.hidden = false;
+}
+
+function hideFlyout() {
+  flyoutEl.hidden = true;
+}
+
+sessionListEl.addEventListener("scroll", hideFlyout);
+
 function rowStep(rows) {
   if (rows.length > 1) return rows[1].offsetTop - rows[0].offsetTop;
   return rows[0] ? rows[0].offsetHeight : 0;
@@ -368,6 +388,7 @@ function beginRowDrag(item, event) {
       if (Math.abs(pointerY - startY) < DRAG_THRESHOLD_PX) return;
       dragging = true;
       rowDragActive = true;
+      hideFlyout();
       item.classList.add("dragging");
       sessionListEl.classList.add("reordering");
       frame = requestAnimationFrame(autoscroll);
@@ -418,6 +439,8 @@ function renderSidebar() {
       if (e.button !== 0 || e.target.closest("button")) return;
       beginRowDrag(item, e);
     });
+    item.addEventListener("pointerenter", () => showFlyout(item, sessionName(session)));
+    item.addEventListener("pointerleave", hideFlyout);
 
     const dot = document.createElement("span");
     dot.className = "dot";
@@ -557,6 +580,7 @@ document.getElementById("new-session").addEventListener("click", createSession);
 document.getElementById("start-btn").addEventListener("click", createSession);
 document.getElementById("collapse").addEventListener("click", () => {
   const collapsed = sidebarEl.classList.toggle("collapsed");
+  hideFlyout();
   document
     .getElementById("collapse-path")
     .setAttribute("d", collapsed ? GLYPHS.chevronRight : GLYPHS.chevronLeft);

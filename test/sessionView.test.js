@@ -30,11 +30,20 @@ test("names a session after its folder", () => {
   assert.equal(sessionName(session({ folder: "/", id: 7 })), "Session 7");
 });
 
-test("monogram is the folder's first alphanumeric, lowercased", () => {
-  assert.equal(sessionMonogram(session()), "a");
-  assert.equal(sessionMonogram(session({ folder: "/x/LOVB-payload" })), "l");
-  assert.equal(sessionMonogram(session({ folder: "/x/.dotfiles" })), "d");
-  assert.equal(sessionMonogram(session({ folder: "/x/2fa" })), "2");
+test("monogram takes the initial of each of the first two name parts", () => {
+  assert.equal(sessionMonogram(session()), "ac");
+  assert.equal(sessionMonogram(session({ folder: "/x/LOVB-payload" })), "lp");
+  assert.equal(sessionMonogram(session({ folder: "/x/job_tracker_app" })), "jt");
+  assert.equal(sessionMonogram(session({ folder: "/x/portfolio.app" })), "pa");
+  assert.equal(sessionMonogram(session({ folder: "/x/my project" })), "mp");
+  assert.equal(sessionMonogram(session({ folder: "/x/myProject" })), "mp");
+});
+
+test("a single-part name falls back to its first two characters", () => {
+  assert.equal(sessionMonogram(session({ folder: "/x/Picstagram" })), "pi");
+  assert.equal(sessionMonogram(session({ folder: "/x/.dotfiles" })), "do");
+  assert.equal(sessionMonogram(session({ folder: "/x/2fa" })), "2f");
+  assert.equal(sessionMonogram(session({ folder: "/x/q" })), "q");
 });
 
 test("monogram falls back when the name has no alphanumerics", () => {
@@ -72,7 +81,7 @@ test("the folder can only change while both panes are closed", () => {
 test("name and monogram follow a changed folder", () => {
   const changed = session({ folder: "/Users/me/projects/lovb-payload" });
   assert.equal(sessionName(changed), "lovb-payload");
-  assert.equal(sessionMonogram(changed), "l");
+  assert.equal(sessionMonogram(changed), "lp");
 });
 
 test("moves a session down the list", () => {

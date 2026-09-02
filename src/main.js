@@ -17,6 +17,7 @@ const { TranscriptReader } = require("./transcriptReader");
 const { toSpeakable } = require("./speakable");
 const { handleWindowOpen } = require("./externalLink");
 const { shouldLaunchClaude, LAUNCH_COMMAND, IDE_PORT_WAIT_MS } = require("./claudeLaunch");
+const { createShutdown } = require("./shutdown");
 
 const SUBMIT_KEY_DELAY_MS = 150;
 
@@ -354,3 +355,14 @@ app.on("window-all-closed", () => {
   tts?.stop();
   if (process.platform !== "darwin") app.quit();
 });
+
+const shutdown = createShutdown({
+  closeSessions: () => {
+    for (const id of [...sessions.keys()]) closeSession(id);
+  },
+  stopTts: () => tts?.stop(),
+  quit: () => app.quit(),
+});
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);

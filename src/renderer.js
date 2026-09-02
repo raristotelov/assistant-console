@@ -250,7 +250,15 @@ function activate(id) {
   renderSidebar();
   syncChrome();
   fitActive();
+  resyncViewport(session.term);
   session.term?.focus();
+}
+
+function resyncViewport(term) {
+  if (!term || term.rows < 2) return;
+  const { cols, rows } = term;
+  term.resize(cols, rows - 1);
+  term.resize(cols, rows);
 }
 
 const ICON_PATHS = {

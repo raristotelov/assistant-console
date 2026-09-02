@@ -119,6 +119,17 @@ async function findIdePort(folder) {
   return null;
 }
 
+// VSCODE_IPC_HOOK_CLI from the terminal that launched us sends code-server down its
+// "hand this to the running VS Code" path, where it exits for want of a file argument.
+function serverEnv(env) {
+  const clean = {};
+  for (const [key, value] of Object.entries(env)) {
+    if (key.startsWith("VSCODE_")) continue;
+    clean[key] = value;
+  }
+  return clean;
+}
+
 function freePort() {
   return new Promise((resolve, reject) => {
     const probe = net.createServer();
@@ -168,12 +179,13 @@ async function start({ rootDir, folder, userDataDir, extensionsDir, templateDir 
       "none",
       "--disable-telemetry",
       "--disable-update-check",
+      "--disable-workspace-trust",
       "--user-data-dir",
       userDataDir,
       "--extensions-dir",
       extensionsDir,
     ],
-    { stdio: ["ignore", "pipe", "pipe"] },
+    { stdio: ["ignore", "pipe", "pipe"], env: serverEnv(process.env) },
   );
 
   let exited = false;
@@ -191,4 +203,4 @@ async function start({ rootDir, folder, userDataDir, extensionsDir, templateDir 
   };
 }
 
-module.exports = { start, findIdePort, VERSION };
+module.exports = { start, findIdePort, serverEnv, VERSION };

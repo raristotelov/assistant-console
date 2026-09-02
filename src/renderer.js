@@ -155,6 +155,7 @@ async function addEditor(session) {
     const { url } = await window.api.editor.open(session.id);
     const view = document.createElement("webview");
     view.setAttribute("src", url);
+    view.setAttribute("allowpopups", "");
     session.editorAdd.wrap.remove();
     session.editorSlot.classList.add("filled");
     session.editorSlot.appendChild(view);

@@ -4,7 +4,7 @@
 
 require("dotenv/config"); // load paths (WHISPER_BIN, KOKORO_PYTHON, ...) from .env
 
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, shell: electronShell } = require("electron");
 const path = require("node:path");
 const os = require("node:os");
 const fs = require("node:fs");
@@ -15,6 +15,8 @@ const { transcribe, TtsEngine, configure } = require("./speech");
 const { ensureWhisperModel, ensurePython } = require("./provision");
 const { TranscriptReader } = require("./transcriptReader");
 const { toSpeakable } = require("./speakable");
+const { handleWindowOpen } = require("./externalLink");
+const { shouldLaunchClaude, LAUNCH_COMMAND, IDE_PORT_WAIT_MS } = require("./claudeLaunch");
 
 const SUBMIT_KEY_DELAY_MS = 150;
 
@@ -38,6 +40,11 @@ function createWindow() {
     },
   });
   win.maximize();
+  win.webContents.on("did-attach-webview", (_event, contents) => {
+    contents.setWindowOpenHandler(({ url }) =>
+      handleWindowOpen(url, (u) => electronShell.openExternal(u)),
+    );
+  });
   win.loadFile(path.join(__dirname, "index.html"));
   win.on("closed", () => {
     win = null;
@@ -163,6 +170,41 @@ function openTerminal(id) {
   reader.start();
 
   Object.assign(session, { term, reader, pointerFile });
+  launchClaude(session);
+}
+
+function launchClaude(session) {
+  if (!session.term || session.claudeLaunched) return;
+
+  const ready = shouldLaunchClaude({
+    isMainTerminal: true,
+    editorPending: !!(session.editor || session.editorStarting),
+    idePort: session.idePort,
+    waitedOut: session.idePortWaitedOut,
+  });
+  if (!ready) {
+    waitForIdePort(session);
+    return;
+  }
+
+  clearIdePortWait(session);
+  session.claudeLaunched = true;
+  session.term.write(LAUNCH_COMMAND);
+}
+
+function waitForIdePort(session) {
+  if (session.idePortWait) return;
+  session.idePortWait = setTimeout(() => {
+    session.idePortWait = null;
+    session.idePortWaitedOut = true;
+    launchClaude(session);
+  }, IDE_PORT_WAIT_MS);
+}
+
+function clearIdePortWait(session) {
+  if (!session.idePortWait) return;
+  clearTimeout(session.idePortWait);
+  session.idePortWait = null;
 }
 
 async function openEditor(id) {
@@ -174,19 +216,27 @@ async function openEditor(id) {
   const rootDir = path.join(app.getPath("userData"), "code-server");
   const folderKey = crypto.createHash("sha1").update(folder).digest("hex").slice(0, 12);
 
-  const editor = await codeServer.start({
-    rootDir,
-    folder,
-    userDataDir: path.join(rootDir, "user-data", folderKey),
-    extensionsDir: path.join(rootDir, "extensions"),
-    templateDir: path.join(rootDir, "user-data-template"),
-  });
-  session.editor = editor;
+  session.editorStarting = true;
+  let editor;
+  try {
+    editor = await codeServer.start({
+      rootDir,
+      folder,
+      userDataDir: path.join(rootDir, "user-data", folderKey),
+      extensionsDir: path.join(rootDir, "extensions"),
+      templateDir: path.join(rootDir, "user-data-template"),
+    });
+    session.editor = editor;
+  } finally {
+    session.editorStarting = false;
+    launchClaude(session);
+  }
 
   codeServer.findIdePort(folder).then((port) => {
     if (!port || sessions.get(id) !== session || session.editor !== editor) return;
     session.idePort = port;
     exportIdePort(session, port);
+    launchClaude(session);
   });
 
   return { url: editor.url };
@@ -203,7 +253,14 @@ function closeTerminal(id) {
   if (!session?.term) return;
 
   const { term, reader, pointerFile } = session;
-  Object.assign(session, { term: null, reader: null, pointerFile: null });
+  clearIdePortWait(session);
+  Object.assign(session, {
+    term: null,
+    reader: null,
+    pointerFile: null,
+    claudeLaunched: false,
+    idePortWaitedOut: false,
+  });
 
   reader?.stop();
   term.kill();

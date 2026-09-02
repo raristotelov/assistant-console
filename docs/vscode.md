@@ -33,7 +33,14 @@ packaging.
 - Extracted with system `tar` into `<userData>/code-server/`.
 - Started with `--bind-addr 127.0.0.1:<free port> --auth none`, plus explicit
   `--user-data-dir` and `--extensions-dir`.
+- `--disable-workspace-trust`, so a session's folder opens trusted with no
+  prompt and no restricted mode. Every folder a session opens is trusted, and
+  extensions run unrestricted in it.
 - Readiness is a TCP connect poll, not log parsing.
+- Spawned without the launching editor's `VSCODE_*` variables. An inherited
+  `VSCODE_IPC_HOOK_CLI` sends code-server down its "hand this to the running VS
+  Code" path, where it exits with `Please specify at least one file or folder`
+  and the pane reports that the server never started.
 
 ## Settings and extensions
 
@@ -47,6 +54,24 @@ packaging.
 
 Extensions come from Open VSX. Ones absent there still work (they were copied)
 but cannot be updated from inside code-server.
+
+## Links out of the editor
+
+An extension signing in calls `window.open(url, "_blank", "noopener")`. Popups
+are off by default in a `<webview>`, so the call was dropped and no browser
+appeared. The webview now carries `allowpopups`, and main answers
+`did-attach-webview` with a window-open handler that denies the popup and hands
+http and https URLs to `shell.openExternal` — the decision itself is
+`handleWindowOpen` in `src/externalLink.js`. Nothing else is opened.
+
+Opening the browser is as far as it goes. Extensions build their redirect from
+the workbench's URL scheme, which `product.json` sets to `code-oss`, and nothing
+on macOS handles `code-oss://` — so the provider's redirect after login is
+dropped and the extension waits on a callback that never arrives. Completing the
+round trip is its own piece of work.
+
+A login does not survive the editor closing — secrets live in the webview's
+localStorage, keyed by an origin whose port changes every launch.
 
 ## Connecting Claude Code to the editor
 

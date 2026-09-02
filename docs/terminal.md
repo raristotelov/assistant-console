@@ -17,8 +17,23 @@
 - env: `process.env` plus `ASSISTANT_CONSOLE_SESSION_FILE` — the pointer file the
   SessionStart hook writes to. This is what marks a session as belonging to the app.
 
-`claude` is not auto-launched. You `cd` to a project and run it yourself, so the
-session starts in the directory you choose.
+## Auto-launching Claude Code
+
+A session's main terminal runs `claude` for you, written into the shell rather
+than spawned in its place — so quitting Claude Code leaves the shell behind and
+the pane stays open.
+
+`shouldLaunchClaude` in `src/claudeLaunch.js` decides when:
+
+- No editor for the session — launch immediately.
+- Editor open or still starting — wait until `findIdePort` has reported the
+  port, because Claude Code reads `CLAUDE_CODE_SSE_PORT` at launch. The wait is
+  capped at `IDE_PORT_WAIT_MS` (10s); after it Claude Code comes up unconnected
+  rather than not at all.
+- Not the main terminal — never. Tabs and splits start at a plain shell.
+
+The launch happens once per pty: closing and reopening the terminal launches
+again, but a `claude` you quit and want back is yours to retype.
 
 ## IPC
 

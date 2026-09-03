@@ -21,6 +21,10 @@ const { createShutdown } = require("./shutdown");
 
 const SUBMIT_KEY_DELAY_MS = 150;
 
+if (!app.isPackaged) {
+  app.setPath("sessionData", path.join(app.getPath("userData"), "session-dev"));
+}
+
 let win;
 let tts;
 let replyId = 0;

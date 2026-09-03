@@ -13,6 +13,22 @@ npm start
 (`xcode-select --install`). If it builds but Electron reports an ABI mismatch,
 run `./node_modules/.bin/electron-rebuild`.
 
+### Running it while you already use the installed app
+
+`npm start` and the installed app can run side by side. A run from source keeps
+its Chromium profile in `session-dev` inside the user data directory, so the two
+never write the same cookies, IndexedDB or service worker storage.
+
+They must not share one profile. Chromium allows a single writer, and two
+instances on the same profile corrupt the quota and service worker databases —
+after which VS Code for the web cannot open IndexedDB, and the editor pane comes
+up blank with nothing logged. Recovering means deleting `IndexedDB`,
+`Service Worker` and `WebStorage/QuotaManager` from the user data directory.
+
+Everything else is still shared: the code-server binary and extensions, the
+whisper model and the provisioned Python, so a run from source costs no extra
+downloads.
+
 ## 2. Speech-to-text — whisper.cpp
 
 Build whisper.cpp and fetch a model. The app needs the binary and model paths

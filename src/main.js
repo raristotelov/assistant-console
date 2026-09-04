@@ -4,7 +4,7 @@
 
 require("dotenv/config"); // load paths (WHISPER_BIN, KOKORO_PYTHON, ...) from .env
 
-const { app, BrowserWindow, ipcMain, dialog, shell: electronShell } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, session, shell: electronShell } = require("electron");
 const path = require("node:path");
 const os = require("node:os");
 const fs = require("node:fs");
@@ -18,6 +18,7 @@ const { toSpeakable } = require("./speakable");
 const { handleWindowOpen } = require("./externalLink");
 const { shouldLaunchClaude, LAUNCH_COMMAND, IDE_PORT_WAIT_MS } = require("./claudeLaunch");
 const { createShutdown } = require("./shutdown");
+const { editorOrigins, PRUNED_STORAGES } = require("./storagePrune");
 
 const SUBMIT_KEY_DELAY_MS = 150;
 
@@ -55,6 +56,18 @@ function createWindow() {
     win = null;
     for (const id of [...sessions.keys()]) closeSession(id);
   });
+}
+
+async function pruneEditorStorage() {
+  let entries;
+  try {
+    entries = fs.readdirSync(path.join(app.getPath("sessionData"), "IndexedDB"));
+  } catch {
+    return;
+  }
+  for (const origin of editorOrigins(entries)) {
+    await session.defaultSession.clearStorageData({ origin, storages: PRUNED_STORAGES });
+  }
 }
 
 function send(channel, payload) {
@@ -291,6 +304,7 @@ function closeSession(id) {
 }
 
 app.whenReady().then(() => {
+  pruneEditorStorage().catch((e) => console.error(`[storage] prune failed: ${e.message || e}`));
   createWindow();
 
   tts = new TtsEngine({

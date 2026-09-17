@@ -22,6 +22,7 @@ jobs:
           - os: macos-15-intel
             platform: mac
             arch: x64
+            extraArgs: -c.dmg.artifactName='${productName}-${version}-intel.${ext}'
           - os: ubuntu-24.04
             platform: linux
             arch: x64
@@ -42,7 +43,7 @@ jobs:
         run: bash scripts/build-whisper.sh
 
       - name: Package
-        run: npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} --publish never
+        run: npx electron-builder --${{ matrix.platform }} --${{ matrix.arch }} ${{ matrix.extraArgs }} --publish never
 
       - uses: actions/upload-artifact@v7
         with:

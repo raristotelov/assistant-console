@@ -43,12 +43,30 @@ see [docs/setup.md](docs/setup.md).
 Pushing a `v*` tag builds all four targets and publishes a GitHub Release:
 
 ```bash
-npm version patch
+npm version patch      # 0.3.0 -> 0.3.1
+npm version minor      # 0.3.0 -> 0.4.0
+npm version major      # 0.3.0 -> 1.0.0
 git push --follow-tags
 ```
 
+Each bumps `package.json`, commits, and creates the annotated tag; the push is
+what starts the build.
+
+The tag name and the `version` in `package.json` must match — artifact
+filenames come from `package.json`, the release name from the tag.
+
+To rebuild an existing version after fixing the workflow, move the tag:
+
+```bash
+git tag -d v0.3.0
+git push origin :refs/tags/v0.3.0
+git tag -a v0.3.0 -m "v0.3.0"
+git push origin v0.3.0
+```
+
 `.github/workflows/release.yml` runs on macOS arm64/x64 and Linux x64/arm64,
-building `whisper-cli` natively on each before packaging.
+building `whisper-cli` natively on each before packaging. Watch a run with
+`gh run watch`.
 
 ## Docs
 

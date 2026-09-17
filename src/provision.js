@@ -9,12 +9,18 @@ const WHISPER_MODEL_URL = `https://huggingface.co/ggerganov/whisper.cpp/resolve/
 const PYTHON_TAG = "20260825";
 const PYTHON_VERSION = "3.11.16";
 
+const PYTHON_TRIPLE = {
+  darwin: "apple-darwin",
+  linux: "unknown-linux-gnu",
+};
+
 function pythonAsset() {
-  if (process.platform !== "darwin") {
+  const triple = PYTHON_TRIPLE[process.platform];
+  if (!triple) {
     throw new Error(`no python build configured for ${process.platform}`);
   }
   const arch = process.arch === "arm64" ? "aarch64" : "x86_64";
-  return `cpython-${PYTHON_VERSION}+${PYTHON_TAG}-${arch}-apple-darwin-install_only.tar.gz`;
+  return `cpython-${PYTHON_VERSION}+${PYTHON_TAG}-${arch}-${triple}-install_only.tar.gz`;
 }
 
 function pythonUrl() {

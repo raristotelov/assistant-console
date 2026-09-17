@@ -25,7 +25,13 @@ cmake -S "$WORK/src" -B "$WORK/build" \
   -DWHISPER_BUILD_TESTS=OFF \
   -DWHISPER_BUILD_SERVER=OFF
 
-cmake --build "$WORK/build" --config Release -j"$(sysctl -n hw.ncpu)"
+if command -v nproc >/dev/null 2>&1; then
+  JOBS="$(nproc)"
+else
+  JOBS="$(sysctl -n hw.ncpu)"
+fi
+
+cmake --build "$WORK/build" --config Release -j"$JOBS"
 
 cp "$WORK/build/bin/whisper-cli" "$OUT/whisper-cli"
 rm -rf "$WORK"

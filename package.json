@@ -2,6 +2,7 @@
   "name": "assistant-console",
   "version": "0.2.0",
   "description": "Native console: a live claude terminal you can type in or talk to, with spoken replies.",
+  "author": "Radostin Aristotelov <53051515+raristotelov@users.noreply.github.com>",
   "main": "src/main.js",
   "scripts": {
     "start": "electron .",
@@ -43,6 +44,17 @@
       "extendInfo": {
         "NSMicrophoneUsageDescription": "Assistant Console uses the microphone so you can speak to Claude Code."
       }
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Development",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     }
   },
   "devDependencies": {

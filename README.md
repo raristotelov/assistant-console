@@ -15,6 +15,18 @@ Not the Agent SDK, not `claude -p`, and voice drives the same single session.
   and spoken by Kokoro sentence-by-sentence as they are generated.
 - Interrupt by speaking (on confirmed words, not on noise), or with Stop.
 
+## Download
+
+Grab a build from [Releases](https://github.com/raristotelov/assistant-console/releases)
+— macOS and Linux, Intel and ARM. Windows is not supported yet.
+
+- **macOS** (`.dmg`) — drag to Applications. The app is ad-hoc signed, not
+  notarized, so first launch is blocked: either open System Settings → Privacy
+  & Security → **Open Anyway**, or run
+  `xattr -dr com.apple.quarantine "/Applications/Assistant Console.app"`.
+- **Linux** (`.AppImage`) — `chmod +x` it and run it. Nothing to install.
+- **Linux** (`.deb`, Debian/Ubuntu) — `sudo apt install ./assistant-console_*.deb`.
+
 ## Run
 
 ```bash
@@ -25,6 +37,18 @@ npm test
 
 Speech needs whisper.cpp, a Kokoro venv, a `.env`, and a `SessionStart` hook —
 see [docs/setup.md](docs/setup.md).
+
+## Release
+
+Pushing a `v*` tag builds all four targets and publishes a GitHub Release:
+
+```bash
+npm version patch
+git push --follow-tags
+```
+
+`.github/workflows/release.yml` runs on macOS arm64/x64 and Linux x64/arm64,
+building `whisper-cli` natively on each before packaging.
 
 ## Docs
 

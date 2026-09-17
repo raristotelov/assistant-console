@@ -57,6 +57,7 @@ class TtsEngine {
     this.onError = onError;
     this.proc = null;
     this.ready = false;
+    this.readyWaiters = [];
     this.stopped = false;
     this.buffer = Buffer.alloc(0);
     this.awaiting = null;
@@ -78,6 +79,12 @@ class TtsEngine {
       this.awaiting = null;
       if (!this.stopped) setTimeout(() => this.start(), 1000);
     });
+  }
+
+  waitUntilReady() {
+    this.start();
+    if (this.ready) return Promise.resolve();
+    return new Promise((resolve) => this.readyWaiters.push(resolve));
   }
 
   stop() {
@@ -128,6 +135,7 @@ class TtsEngine {
       }
       if (header.ready) {
         this.ready = true;
+        for (const resolve of this.readyWaiters.splice(0)) resolve();
       } else if (header.error) {
         this.onError(header.error);
       } else if (typeof header.len === "number") {

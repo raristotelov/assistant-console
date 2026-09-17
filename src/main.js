@@ -12,7 +12,7 @@ const crypto = require("node:crypto");
 const pty = require("node-pty");
 const codeServer = require("./codeServer");
 const { transcribe, TtsEngine, configure } = require("./speech");
-const { ensureWhisperModel, ensurePython } = require("./provision");
+const { ensureWhisperModel, ensurePython, isProvisioned } = require("./provision");
 const { TranscriptReader } = require("./transcriptReader");
 const { toSpeakable } = require("./speakable");
 const { handleWindowOpen } = require("./externalLink");
@@ -27,6 +27,7 @@ if (!app.isPackaged) {
 }
 
 let win;
+let setupWin;
 let tts;
 let replyId = 0;
 const replySessions = new Map();
@@ -58,6 +59,26 @@ function createWindow() {
   });
 }
 
+function createSetupWindow() {
+  setupWin = new BrowserWindow({
+    width: 460,
+    height: 220,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    backgroundColor: "#30353c",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  setupWin.loadFile(path.join(__dirname, "setup.html"));
+  setupWin.on("closed", () => {
+    setupWin = null;
+  });
+}
+
 async function pruneEditorStorage() {
   let entries;
   try {
@@ -73,6 +94,12 @@ async function pruneEditorStorage() {
 function send(channel, payload) {
   if (!win || win.isDestroyed()) return;
   win.webContents.send(channel, payload);
+}
+
+function sendStatus(text) {
+  const target = setupWin && !setupWin.isDestroyed() ? setupWin : win;
+  if (!target || target.isDestroyed()) return;
+  target.webContents.send("voice:status", text);
 }
 
 async function pickFolder(title, buttonLabel) {
@@ -115,26 +142,41 @@ async function setSessionFolder(id) {
 
 let voiceReady = null;
 
+function codeServerDir() {
+  return path.join(app.getPath("userData"), "code-server");
+}
+
 function ensureVoiceReady() {
   if (voiceReady) return voiceReady;
 
   const rootDir = app.getPath("userData");
-  const onStatus = (text) => send("voice:status", text);
 
   voiceReady = (async () => {
-    const model = await ensureWhisperModel(rootDir, onStatus);
-    const python = await ensurePython(rootDir, onStatus);
+    const model = await ensureWhisperModel(rootDir, sendStatus);
+    const python = await ensurePython(rootDir, sendStatus);
     configure({ model, python });
-    onStatus("");
-    tts.start();
+    sendStatus("starting the voice");
+    await tts.waitUntilReady();
+    sendStatus("");
   })();
 
   voiceReady.catch((e) => {
     voiceReady = null;
-    onStatus(`voice setup failed: ${e.message || e}`);
+    sendStatus(`voice setup failed: ${e.message || e}`);
   });
 
   return voiceReady;
+}
+
+function needsProvisioning() {
+  return !isProvisioned(app.getPath("userData")) || !codeServer.isDownloaded(codeServerDir());
+}
+
+async function provisionEverything() {
+  await ensureVoiceReady();
+  sendStatus("downloading the editor");
+  await codeServer.ensureBinary(codeServerDir());
+  sendStatus("");
 }
 
 const INHERITED_EDITOR_KEYS = ["TERM_PROGRAM", "TERM_PROGRAM_VERSION", "CLAUDE_CODE_SSE_PORT"];
@@ -231,7 +273,7 @@ async function openEditor(id) {
   if (session.editor) return { url: session.editor.url };
 
   const folder = session.folder;
-  const rootDir = path.join(app.getPath("userData"), "code-server");
+  const rootDir = codeServerDir();
   const folderKey = crypto.createHash("sha1").update(folder).digest("hex").slice(0, 12);
 
   session.editorStarting = true;
@@ -303,9 +345,8 @@ function closeSession(id) {
   sessions.delete(id);
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   pruneEditorStorage().catch((e) => console.error(`[storage] prune failed: ${e.message || e}`));
-  createWindow();
 
   tts = new TtsEngine({
     onChunk: (header, wav) => {
@@ -366,6 +407,14 @@ app.whenReady().then(() => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+
+  if (needsProvisioning()) {
+    createSetupWindow();
+    await provisionEverything().catch((e) => console.error(`[setup] ${e.message || e}`));
+    setupWin?.destroy();
+  }
+
+  createWindow();
 });
 
 app.on("window-all-closed", () => {

@@ -38,8 +38,20 @@ function run(bin, args) {
   });
 }
 
+function whisperModelPath(rootDir) {
+  return path.join(rootDir, "models", WHISPER_MODEL_FILE);
+}
+
+function pythonBinPath(rootDir) {
+  return path.join(rootDir, "python", "bin", "python3");
+}
+
+function isProvisioned(rootDir) {
+  return fs.existsSync(whisperModelPath(rootDir)) && fs.existsSync(pythonBinPath(rootDir));
+}
+
 async function ensureWhisperModel(rootDir, onStatus) {
-  const dest = path.join(rootDir, "models", WHISPER_MODEL_FILE);
+  const dest = whisperModelPath(rootDir);
   if (fs.existsSync(dest)) return dest;
 
   fs.mkdirSync(path.dirname(dest), { recursive: true });
@@ -49,7 +61,7 @@ async function ensureWhisperModel(rootDir, onStatus) {
 }
 
 async function ensurePython(rootDir, onStatus) {
-  const bin = path.join(rootDir, "python", "bin", "python3");
+  const bin = pythonBinPath(rootDir);
   if (fs.existsSync(bin)) return bin;
 
   fs.mkdirSync(rootDir, { recursive: true });
@@ -65,4 +77,4 @@ async function ensurePython(rootDir, onStatus) {
   return bin;
 }
 
-module.exports = { ensureWhisperModel, ensurePython };
+module.exports = { ensureWhisperModel, ensurePython, isProvisioned };

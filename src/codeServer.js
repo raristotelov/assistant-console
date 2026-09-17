@@ -21,11 +21,19 @@ function downloadUrl() {
   return `https://github.com/coder/code-server/releases/download/v${VERSION}/${assetName()}.tar.gz`;
 }
 
+function binaryPath(rootDir) {
+  return path.join(rootDir, assetName(), "bin", "code-server");
+}
+
+function isDownloaded(rootDir) {
+  return fs.existsSync(binaryPath(rootDir));
+}
+
 async function ensureBinary(rootDir) {
   if (process.platform === "win32") {
     throw new Error("code-server publishes no Windows build");
   }
-  const bin = path.join(rootDir, assetName(), "bin", "code-server");
+  const bin = binaryPath(rootDir);
   if (fs.existsSync(bin)) return bin;
 
   fs.mkdirSync(rootDir, { recursive: true });
@@ -203,4 +211,4 @@ async function start({ rootDir, folder, userDataDir, extensionsDir, templateDir 
   };
 }
 
-module.exports = { start, findIdePort, serverEnv, VERSION };
+module.exports = { start, findIdePort, serverEnv, ensureBinary, isDownloaded, VERSION };

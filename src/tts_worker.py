@@ -88,6 +88,7 @@ def main():
 
     voice = os.environ.get("KOKORO_VOICE", "af_heart")
     pipeline = KPipeline(lang_code="a", repo_id="hexgrad/Kokoro-82M")
+    pipeline.load_voice(voice)
 
     inbox = Inbox()
     emit({"ready": True})

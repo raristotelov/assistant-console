@@ -46,7 +46,7 @@
       }
     },
     "linux": {
-      "icon": "build/icon.png",
+      "icon": "build/icons",
       "category": "Development",
       "target": [
         "AppImage",

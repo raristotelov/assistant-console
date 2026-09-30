@@ -26,6 +26,11 @@ contextBridge.exposeInMainWorld("api", {
     onExit: (cb) => ipcRenderer.on("term:exit", (_e, payload) => cb(payload)),
   },
 
+  clipboard: {
+    write: (text) => ipcRenderer.send("clipboard:write", text),
+    read: () => ipcRenderer.invoke("clipboard:read"),
+  },
+
   voice: {
     setReading: (id, on) => ipcRenderer.send("voice:reading", { id, on }),
     transcribe: (arrayBuffer) => ipcRenderer.invoke("voice:transcribe", arrayBuffer),

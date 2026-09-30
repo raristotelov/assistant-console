@@ -4,7 +4,15 @@
 
 require("dotenv/config"); // load paths (WHISPER_BIN, KOKORO_PYTHON, ...) from .env
 
-const { app, BrowserWindow, ipcMain, dialog, session, shell: electronShell } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  dialog,
+  session,
+  clipboard,
+  shell: electronShell,
+} = require("electron");
 const path = require("node:path");
 const os = require("node:os");
 const fs = require("node:fs");
@@ -380,6 +388,9 @@ app.whenReady().then(async () => {
     setTimeout(() => sessions.get(id)?.term?.write("\r"), SUBMIT_KEY_DELAY_MS);
   });
 
+  ipcMain.on("clipboard:write", (_e, text) => clipboard.writeText(text));
+  ipcMain.handle("clipboard:read", () => clipboard.readText());
+
   // reading toggle, per session — when off, that session's replies aren't spoken.
   ipcMain.on("voice:reading", (_e, { id, on }) => {
     const session = sessions.get(id);
@@ -411,10 +422,10 @@ app.whenReady().then(async () => {
   if (needsProvisioning()) {
     createSetupWindow();
     await provisionEverything().catch((e) => console.error(`[setup] ${e.message || e}`));
-    setupWin?.destroy();
   }
 
   createWindow();
+  setupWin?.destroy();
 });
 
 app.on("window-all-closed", () => {

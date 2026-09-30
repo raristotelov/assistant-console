@@ -146,6 +146,22 @@ async function addTerminal(session) {
   term.loadAddon(fit);
   term.open(session.termSlot);
   term.onData((data) => window.api.term.input(session.id, data));
+  term.attachCustomKeyEventHandler((e) => {
+    if (e.type !== "keydown" || !e.ctrlKey || !e.shiftKey) return true;
+    const key = e.key.toLowerCase();
+    if (key === "c") {
+      const selection = term.getSelection();
+      if (selection) window.api.clipboard.write(selection);
+      return false;
+    }
+    if (key === "v") {
+      window.api.clipboard.read().then((text) => {
+        if (text) window.api.term.input(session.id, text);
+      });
+      return false;
+    }
+    return true;
+  });
 
   session.term = term;
   session.fit = fit;
